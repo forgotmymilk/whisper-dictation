@@ -29,6 +29,7 @@ LANGUAGES = [
 OUTPUT_MODES = ["type", "clipboard", "both"]
 FORMALITY_LEVELS = ["casual", "formal", "business"]
 PRIMARY_LANGS = [("Auto", "auto"), ("Chinese", "zh"), ("English", "en"), ("Mixed", "mixed")]
+INPUT_METHODS = ["unicode", "keyboard", "clipboard"]
 
 # ============ TOOLTIPS ============
 
@@ -44,6 +45,7 @@ TIPS = {
     "enable_capitalization": "Capitalize English sentences",
     "max_line_length": "Max chars per line when formatting is on",
     "output_mode": "type = keyboard, clipboard = copy, both = type + copy",
+    "input_method": "unicode = standard, keyboard = legacy, clipboard = ctrl+v paste",
     "sample_rate": "Audio Hz (16000 optimal for Whisper)",
     "audio_threshold": "Min mic level for startup test",
     "min_duration": "Ignore recordings shorter than this (sec)",
@@ -361,6 +363,7 @@ class SettingsApp(ctk.CTk):
     def _build_output_audio(self):
         c = self._card("📤  OUTPUT & AUDIO")
         self._dropdown(c, "Output mode", "output_mode", OUTPUT_MODES)
+        self._dropdown(c, "Input method", "input_method", INPUT_METHODS)
         self._spinbox(c, "Sample rate (Hz)", "sample_rate", 8000, 48000, step=8000)
         self._spinbox(c, "Audio threshold", "audio_threshold", 0.001, 0.5, step=0.005)
         self._spinbox(c, "Min recording (sec)", "min_duration", 0.1, 5.0, step=0.1)
@@ -481,6 +484,7 @@ class SettingsApp(ctk.CTk):
 
             # Output
             c["output_mode"] = self.vars["output_mode"].get()
+            c["input_method"] = self.vars["input_method"].get()
             c["sample_rate"] = int(float(self.vars["sample_rate"].get()))
             c["audio_threshold"] = float(self.vars["audio_threshold"].get())
             c["min_duration"] = float(self.vars["min_duration"].get())

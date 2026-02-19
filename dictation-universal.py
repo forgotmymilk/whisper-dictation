@@ -56,6 +56,7 @@ DEFAULT_CONFIG = {
     "sample_rate": 16000,
     "audio_threshold": 0.01,
     "min_duration": 0.5,
+    "input_method": "unicode", # Options: unicode, keyboard, clipboard
     "auto_minimize_console": True,
     "sound_feedback": True,
     "initial_prompt": None,
@@ -90,6 +91,88 @@ DEVICE_PROFILE_FILE = "device-profile.json"
 # Language detection patterns
 ENGLISH_PATTERN = re.compile(r'^[a-zA-Z\s\.,!?;:\-\'"()[\]{}]+$')
 CHINESE_PATTERN = re.compile(r'[\u4e00-\u9fff]')
+
+# ============ WINDOWS INPUT API ============
+if platform.system() == "Windows":
+    import ctypes
+    from ctypes import wintypes
+
+    user32 = ctypes.WinDLL('user32', use_last_error=True)
+
+    INPUT_KEYBOARD = 1
+    KEYEVENTF_UNICODE = 0x0004
+    KEYEVENTF_KEYUP = 0x0002
+
+    class KEYBDINPUT(ctypes.Structure):
+        _fields_ = [
+            ("wVk", wintypes.WORD),
+            ("wScan", wintypes.WORD),
+            ("dwFlags", wintypes.DWORD),
+            ("time", wintypes.DWORD),
+            ("dwExtraInfo", ctypes.c_size_t),
+        ]
+
+    class MOUSEINPUT(ctypes.Structure):
+        _fields_ = [
+            ("dx", wintypes.LONG),
+            ("dy", wintypes.LONG),
+            ("mouseData", wintypes.DWORD),
+            ("dwFlags", wintypes.DWORD),
+            ("time", wintypes.DWORD),
+            ("dwExtraInfo", ctypes.c_size_t),
+        ]
+
+    class HARDWAREINPUT(ctypes.Structure):
+        _fields_ = [
+            ("uMsg", wintypes.DWORD),
+            ("wParamL", wintypes.WORD),
+            ("wParamH", wintypes.WORD),
+        ]
+
+    class INPUT_u(ctypes.Union):
+        _fields_ = [("ki", KEYBDINPUT), ("mi", MOUSEINPUT), ("hi", HARDWAREINPUT)]
+
+    class INPUT(ctypes.Structure):
+        _fields_ = [("type", wintypes.DWORD), ("u", INPUT_u)]
+
+    def send_unicode_input(text, delay=0.01):
+        """Send Unicode text input using low-level Windows API."""
+        if not text:
+            return
+        for char in text:
+            code = ord(char)
+            # UTF-16 surrogate pairs support
+            if code > 0xFFFF:
+                # High surrogate
+                h = 0xD800 + ((code - 0x10000) >> 10)
+                # Low surrogate
+                l = 0xDC00 + ((code - 0x10000) & 0x3FF)
+                _send_unicode_char(h)
+                _send_unicode_char(l)
+            else:
+                _send_unicode_char(code)
+            
+            # Vital for some apps to process the event
+            time.sleep(delay)
+
+    def _send_unicode_char(code):
+        # Key down
+        inputs = (INPUT * 2)()
+        inputs[0].type = INPUT_KEYBOARD
+        inputs[0].u.ki.wVk = 0
+        inputs[0].u.ki.wScan = code
+        inputs[0].u.ki.dwFlags = KEYEVENTF_UNICODE
+        
+        # Key up
+        inputs[1].type = INPUT_KEYBOARD
+        inputs[1].u.ki.wVk = 0
+        inputs[1].u.ki.wScan = code
+        inputs[1].u.ki.dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP
+        
+        user32.SendInput(2, ctypes.byref(inputs), ctypes.sizeof(INPUT))
+else:
+    def send_unicode_input(text):
+        keyboard.write(text)
 # ======================================
 
 class DeviceProfiler:
@@ -616,6 +699,7 @@ class WhisperDictation:
 
         # Output & audio
         self.output_mode = config.get("output_mode", "type")
+        self.input_method = config.get("input_method", "unicode")
         self.sample_rate = config.get("sample_rate", 16000)
         self.audio_threshold = config.get("audio_threshold", 0.01)
         self.min_duration = config.get("min_duration", 0.5)
@@ -903,7 +987,16 @@ class WhisperDictation:
             # in chat apps (Slack, Teams, WeChat, etc.)
             safe_text = text.replace("\n\n", " ").replace("\n", " ")
             time.sleep(0.05)
-            keyboard.write(safe_text)
+            
+            if self.input_method == "unicode":
+                send_unicode_input(safe_text)
+            elif self.input_method == "clipboard":
+                # Fallback to pasting if the app supports it better
+                pyperclip.copy(safe_text)
+                keyboard.press_and_release('ctrl+v')
+            else:
+                # Default legacy method
+                keyboard.write(safe_text)
 
     # ---- Main loop ----
 
@@ -1004,15 +1097,29 @@ def hide_console_window():
         pass
 
 
+def is_admin():
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin()
+    except:
+        return False
+
 def main():
     """Main entry point."""
+    if not is_admin():
+        print("\n⚠️  WARNING: Not running as Administrator")
+        print("   Dictation might NOT work in some games or apps (e.g. Task Manager, Fluent Search).")
+        print("   Please right-click the script/bat and select 'Run as Administrator' if you have issues.\n")
+        time.sleep(2)
+
     try:
         config = load_or_setup_config()
 
         if not test_microphone():
-            print("Please check your microphone settings and try again.")
-            input("\nPress Enter to exit...")
-            return
+            print("⚠️  Microphone check failed.")
+            print("   This might be a false alarm if you were silent.")
+            choice = input("   Continue anyway? (y/n) [y]: ").strip().lower()
+            if choice == 'n':
+                return
 
         app = WhisperDictation(config)
 

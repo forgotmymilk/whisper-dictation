@@ -2,9 +2,11 @@
 
 ## Project Overview
 
-Whisper Dictation is a real-time speech-to-text desktop application for Windows with GPU acceleration. It uses OpenAI's Whisper model with faster-whisper for optimized inference.
+Whisper Dictation is a real-time speech-to-text desktop application for Windows with GPU acceleration using OpenAI's Whisper model.
 
-**Tech Stack:** Python 3, faster-whisper, PyTorch 2.1+, CUDA 12.1, sounddevice, pyaudio, webrtcvad
+**Tech Stack:** Python 3, faster-whisper, PyTorch 2.1+, CUDA, sounddevice, pynput, pyperclip
+
+---
 
 ## Build, Test & Development Commands
 
@@ -27,58 +29,59 @@ python dictation-enhanced.py
 python dictation-simple.py
 ```
 
-### Testing & Debugging
+### Testing & Diagnostics
 ```bash
-# Check microphone and system setup
+# Verify installation and dependencies
+python test_setup.py
+
+# Check microphone configuration
 python check-mic.py
 
 # Run system diagnostics
 python diagnose.py
-
-# Test setup
-python test-setup.py
 ```
 
 ### Launch Scripts
 ```bash
-# Run specific variant via batch file
-start-universal.bat  # Universal variant
-start-enhanced.bat   # Enhanced variant
-start-simple.bat     # Simple variant
+# Windows batch files
+start-universal.bat    # Universal variant
+start-enhanced.bat     # Enhanced variant  
+start-simple.bat       # Simple variant
+test-microphone.bat    # Microphone test
+test-keys.bat          # Hotkey test
+run-diagnose.bat       # Full diagnostics
 ```
 
-### Manual Testing Commands
+### Python Unit Testing (if pytest added)
 ```bash
-# Check microphone configuration
-test-microphone.bat
+# Run all tests
+pytest tests/
 
-# Verify hotkey functionality
-test-keys.bat
+# Run specific test file
+pytest tests/test_transcription.py
 
-# Run all diagnostics
-run-diagnose.bat
+# Run specific test
+pytest tests/test_transcription.py::test_basic_transcription
+
+# Run with coverage
+pytest --cov=. tests/
 ```
+
+---
 
 ## Code Style Guidelines
-
-### General Principles
-- **Modular Design:** Keep functionality separated into classes and functions
-- **Configuration-Driven:** Use JSON files for settings (config.json)
-- **Error Handling:** Use try/catch with graceful degradation
-- **Device-Aware:** Always check for GPU availability and fall back to CPU
-- **User-Friendly:** Provide clear error messages and fallback options
 
 ### Naming Conventions
 
 **Python:**
-- **Functions/Variables:** snake_case (`get_device_info()`, `transcribe_audio()`)
-- **Classes:** PascalCase (`WhisperDictation`, `DeviceProfiler`)
-- **Constants:** UPPER_SNAKE_CASE (`MAX_AUDIO_DURATION`, `MODEL_TYPES`)
-- **Private members:** underscore prefix (`_format_text()`, `_detect_device()`)
+- Functions/Variables: snake_case (`get_device_info()`, `transcribe_audio()`)
+- Classes: PascalCase (`WhisperDictation`, `DeviceProfiler`)
+- Constants: UPPER_SNAKE_CASE (`MAX_AUDIO_DURATION`, `SAMPLE_RATE`)
+- Private members: underscore prefix (`_format_text()`, `_detect_device()`)
 
 **File Naming:**
-- Python files: snake_case (`dictation-universal.py`, `check-mic.py`)
-- Batch files: kebab-case or snake_case (`start-universal.bat`, `test-microphone.bat`)
+- Python files: snake_case (`dictation-universal.py`, `check_mic.py`)
+- Batch files: kebab-case (`start-universal.bat`, `test-microphone.bat`)
 
 ### Import Organization
 ```python
@@ -87,6 +90,7 @@ import os
 import json
 import asyncio
 import numpy as np
+from typing import Optional, Dict, List
 
 from faster_whisper import WhisperModel
 import sounddevice as sd
@@ -98,89 +102,37 @@ from config import Config
 from device_profiler import DeviceProfiler
 ```
 
+### Type Hints
+```python
+# Required on all function signatures
+def transcribe(self, audio_data: np.ndarray) -> str:
+    """Transcribe audio to text."""
+    pass
+
+def get_device_info(self) -> Optional[Dict[str, any]]:
+    """Get current device information."""
+    pass
+```
+
 ### Code Structure Patterns
 
 **Class-based Architecture:**
 ```python
 class WhisperDictation:
+    """Main dictation application with real-time speech-to-text."""
+
     def __init__(self):
         self.config = Config()
         self.device_profiler = DeviceProfiler()
-        self.model = None
+        self.model: Optional[WhisperModel] = None
 
-    def initialize(self):
-        # Initialize components
+    def initialize(self) -> bool:
+        """Initialize components. Returns True on success."""
         pass
 
-    async def start_recording(self):
-        # Recording logic
+    async def transcribe(self, audio_data: np.ndarray) -> str:
+        """Transcribe audio using Whisper model."""
         pass
-
-    async def transcribe(self, audio_data):
-        # Transcription logic
-        pass
-```
-
-**Configuration-Driven Design:**
-```python
-class Config:
-    def __init__(self):
-        self.load_config()
-
-    def load_config(self):
-        # Load from config.json with fallbacks
-        pass
-```
-
-**Error Handling Pattern:**
-```python
-try:
-    result = await self.whisper_model.transcribe(audio_data)
-except Exception as e:
-    logger.error(f"Transcription failed: {e}")
-    # Fall back to CPU or retry
-    result = await self._transcribe_with_cpu(audio_data)
-```
-
-### Formatting Standards
-
-**String Formatting:**
-```python
-# Use f-strings for simple formatting
-message = f"Detected device: {device_name}"
-error_msg = f"Failed to load model {model_name}: {str(e)}"
-
-# Use json.dumps for config files
-json.dump(config, file, indent=2, ensure_ascii=False)
-```
-
-**File I/O:**
-```python
-# Always use with statements for file operations
-with open("config.json", "r", encoding="utf-8") as f:
-    config = json.load(f)
-
-# Use UTF-8 encoding for cross-platform compatibility
-with open("output.txt", "w", encoding="utf-8") as f:
-    f.write(text)
-```
-
-### Async Programming
-```python
-# Use async/await for I/O operations
-async def record_audio(duration=3):
-    audio = sd.rec(int(duration * SAMPLE_RATE), 
-                   samplerate=SAMPLE_RATE, 
-                   channels=1)
-    await asyncio.sleep(duration)
-    return audio
-
-# Handle concurrent operations
-async def run_dictation():
-    while True:
-        audio = await record_audio()
-        text = await transcribe(audio)
-        await type_text(text)
 ```
 
 ### Error Handling Best Practices
@@ -188,13 +140,13 @@ async def run_dictation():
 1. **Catch Specific Exceptions:**
 ```python
 try:
-    result = await self.model.transcribe(audio)
+    result = await self.model.transcribe(audio_data)
 except OSError as e:
     # Device/audio issues
-    logger.error(f"Audio device error: {e}")
+    print(f"Audio device error: {e}")
 except Exception as e:
-    # Unexpected errors
-    logger.error(f"Transcription error: {e}")
+    # Unexpected errors - log and re-raise
+    logger.error(f"Transcription failed: {e}")
     raise
 ```
 
@@ -204,7 +156,7 @@ try:
     device = self.device_profiler.get_best_device()
 except RuntimeError as e:
     # Fall back to CPU if GPU unavailable
-    logger.warning(f"GPU unavailable: {e}")
+    print(f"GPU unavailable: {e}, falling back to CPU")
     device = "cpu"
 ```
 
@@ -214,192 +166,117 @@ except RuntimeError as e:
     print(f"Error: {e}\nFalling back to CPU mode. Install CUDA for better performance.")
 ```
 
-### Documentation Comments
+### Formatting Standards
 
+**String Formatting:**
 ```python
-class WhisperDictation:
-    """Main dictation application with real-time speech-to-text.
+# Use f-strings
+message = f"Detected device: {device_name}"
+error_msg = f"Failed to load model {model_name}: {e}"
 
+# Use json.dumps for config files
+json.dump(config, file, indent=2, ensure_ascii=False)
+```
+
+**File I/O:**
+```python
+# Always use with statements + UTF-8 encoding
+with open("config.json", "r", encoding="utf-8") as f:
+    config = json.load(f)
+
+with open("output.txt", "w", encoding="utf-8") as f:
+    f.write(text)
+```
+
+### Documentation Comments
+```python
+class SmartFormatter:
+    """Universal Text Formatter for Chinese & English.
+    
     Features:
-        - GPU-accelerated transcription
-        - Smart punctuation and formatting
-        - Multi-language support
+        - Auto punctuation for both languages
+        - Smart capitalization
+        - Layout formatting
     """
 
-    async def transcribe(self, audio_data: np.ndarray) -> str:
-        """Transcribe audio using Whisper model.
-
+    @staticmethod
+    def format_text(text: str, lang: Optional[str] = None) -> str:
+        """Format text with punctuation and capitalization.
+        
         Args:
-            audio_data: numpy array of audio samples
-
+            text: Input text to format
+            lang: Language hint ('zh', 'en', 'mixed', or None for auto-detect)
+            
         Returns:
-            Transcribed text string
+            Formatted text string
         """
         pass
 ```
 
-## Test Strategy
-
-### Manual Testing
-```bash
-# Test microphone input
-test-microphone.bat
-
-# Test hotkey registration
-test-keys.bat
-
-# Run all diagnostics
-run-diagnose.bat
-```
-
-### Code Testing (Future)
-```bash
-# Install pytest if testing framework is added
-pip install pytest
-
-# Run all tests
-pytest tests/
-
-# Run specific test
-pytest tests/test_transcription.py::test_basic_transcription
-
-# Run with coverage
-pytest --cov=. tests/
-```
+---
 
 ## Configuration
 
-### Core Settings (config.json)
+### Core Settings (user-config.json)
 ```json
 {
   "hotkey": "f15",
   "language": null,
   "model": "large-v3",
   "compute_type": "float16",
+  "device": "cuda",
   "enable_punctuation": true,
-  "enable_formatting": false,
-  "initial_prompt": "Chinese and English mixed text"
+  "enable_formatting": true,
+  "output_mode": "both"
 }
 ```
 
-### Device Detection
-- Automatic GPU/CPU switching based on VRAM
-- Uses `device-profile.json` for system profiling
-- Falls back to CPU if GPU fails
-
 ### Output Modes
-1. **Type directly:** Uses pynput.keyboard
-2. **Clipboard only:** Uses pyperclip
-3. **Both:** Simultaneous typing and clipboard
+1. **type**: Types text directly using pynput.keyboard
+2. **clipboard**: Copies to clipboard using pyperclip
+3. **both**: Types AND copies to clipboard
 
-## Architecture Overview
+---
+
+## Architecture
 
 ```
 WhisperDictation
-├── DeviceProfiler (hardware detection)
-├── SmartFormatter (text processing)
-├── SetupWizard (configuration)
-└── Recording Pipeline
-    ├── Audio Capture (sounddevice)
-    ├── VAD (webrtcvad)
-    ├── Whisper Inference (faster-whisper)
-    ├── Formatting & Capitalization
-    └── Output (keyboard/pyperclip)
+├── DeviceProfiler    # GPU/CPU detection
+├── SmartFormatter    # Text processing
+├── Recording Pipeline
+│   ├── Audio Capture (sounddevice)
+│   ├── VAD (webrtcvad)
+│   └── Whisper Inference (faster-whisper)
+└── Output (keyboard/pyperclip)
 ```
+
+---
 
 ## Key Dependencies
 
-- **faster-whisper:** Optimized Whisper model wrapper
+- **faster-whisper:** Optimized Whisper model
 - **PyTorch 2.1+:** GPU acceleration
-- **CUDA 12.1:** NVIDIA GPU support
 - **sounddevice:** Audio capture
-- **webrtcvad:** Voice Activity Detection
 - **pynput:** Keyboard simulation
 - **pyperclip:** Clipboard operations
 - **numpy:** Audio processing
 
-## Special Considerations
+---
 
-### GPU Optimization
-- Use `float16` compute type for NVIDIA GPUs
-- Auto-detect VRAM and select appropriate model
-- Fall back to CPU gracefully on failures
+## Common Issues
 
-### Chinese/English Mixed Text
-- Use `enable_punctuation: true` for auto-punctuation
-- Set `initial_prompt` to describe language mix
-- Use `dictation-enhanced.py` variant for Chinese punctuation
+| Issue | Solution |
+|-------|----------|
+| Microphone not detected | Run `python check-mic.py` |
+| GPU not found | Run `python diagnose.py` |
+| Hotkey not working | Run `test-keys.bat` |
+| Model download failed | Check internet, verify CUDA |
 
-### Performance
-- Model size: large-v3 (~3GB)
-- Initial load time: 10-30 seconds
-- Real-time transcription: GPU dependent
-- Battery usage: Low with GPU off
-
-### Portability
-- All configuration in JSON files
-- Virtual environment for dependency isolation
-- No build tools required (pure Python)
-- Works offline after initial model download
-
-## Common Issues & Solutions
-
-### Microphone Issues
-```bash
-python check-mic.py
-# Or run: test-microphone.bat
-```
-
-### GPU Not Detected
-```bash
-python diagnose.py
-# Or run: run-diagnose.bat
-```
-
-### Hotkey Conflicts
-```bash
-python test-keys.bat
-# Check for conflicting key bindings
-```
-
-### Model Download Failed
-- Manual download from HuggingFace
-- Place in `.cache/huggingface/hub/`
-- Check internet connection
-- Verify CUDA installation
+---
 
 ## Development Workflow
 
-1. **Modify code** → Update relevant function/class
-2. **Test changes** → Run relevant batch test file
-3. **Check config** → Verify settings in config.json
-4. **Run diagnostics** → Use diagnose.py for issues
-5. **Update docs** → Keep README and guides current
-
-## Environment Variables
-
-```bash
-# CUDA version
-CUDA_VERSION=12.1
-
-# Model cache location
-HF_HOME=~/.cache/huggingface
-
-# Audio device
-PYAUDIO_DEVICE_INDEX=1
-```
-
-## Security Notes
-
-- All operations run locally (no cloud processing)
-- API keys not required
-- Local file system only
-- No network calls except initial model download
-
-## Performance Optimization Tips
-
-1. **Use GPU:** CUDA enabled for best performance
-2. **Compute Type:** Use `float16` for RTX series
-3. **Model Size:** Balance accuracy vs speed
-4. **Audio Quality:** Use good microphone
-5. **Background Noise:** Use headphones for dictation
+1. Modify code → Test with batch files
+2. Run diagnostics → Verify settings
+3. Update docs → Keep AGENTS.md current

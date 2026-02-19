@@ -2,7 +2,6 @@
 chcp 65001 >nul
 echo ==========================================
 echo   Universal Whisper Dictation
-echo   通用智能语音输入系统
 echo ==========================================
 echo.
 
@@ -20,7 +19,7 @@ if not exist ".venv\Scripts\python.exe" (
 )
 
 echo [*] Starting Universal Whisper Dictation...
-echo [*] Press ESC to exit at any time
+echo [*] Right-click tray icon to exit
 echo.
 
 .venv\Scripts\python.exe dictation-universal.py

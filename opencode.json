@@ -1,0 +1,35 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "alibaba-bailian": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Alibaba Bailian",
+      "options": {
+        "baseURL": "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      },
+      "models": {
+        "qwen-coder-plus-latest": {
+          "name": "Qwen Coder Plus (Latest)",
+          "limit": {
+            "context": 128000,
+            "output": 8192
+          }
+        },
+        "qwen-max-latest": {
+          "name": "Qwen Max (Latest)",
+          "limit": {
+            "context": 128000,
+            "output": 8192
+          }
+        },
+        "qwen-plus-latest": {
+          "name": "Qwen Plus (Latest)",
+          "limit": {
+            "context": 128000,
+            "output": 8192
+          }
+        }
+      }
+    }
+  }
+}

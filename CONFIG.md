@@ -33,7 +33,8 @@ All settings are in `config.json`. Every field is optional — defaults are appl
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `output_mode` | `"type"` | `type` / `clipboard` / `both` |
+| `output_mode` | `"type"` | `type` / `clipboard` / `both` | Output format |
+| `input_method` | `"unicode"` | `unicode` / `keyboard` / `clipboard` | `unicode` is best for games and floating windows |
 | `sample_rate` | `16000` | Audio sample rate in Hz (16000 optimal for Whisper) |
 | `audio_threshold` | `0.01` | Min mic level for startup test |
 | `min_duration` | `0.5` | Ignore recordings shorter than this (sec) |
