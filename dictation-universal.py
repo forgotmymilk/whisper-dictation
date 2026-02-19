@@ -23,10 +23,15 @@ import os
 import re
 import platform
 import subprocess
+import threading
+import ctypes
 from pathlib import Path
 from faster_whisper import WhisperModel
 from scipy.io.wavfile import write as wav_write
 import tempfile
+
+import pystray
+from PIL import Image, ImageDraw
 
 # ============ CONFIGURATION ============
 DEFAULT_CONFIG = {
@@ -529,19 +534,37 @@ class SetupWizard:
 
 
 class WhisperDictation:
-    """Main dictation class"""
-    
+    """Main dictation class with system tray lifecycle.
+
+    Lifecycle:
+        Start → Tray icon (✅ Ready) → Console minimizes
+        Hold F15 → 🔴 Recording → Release → Transcribe → ✅ Ready
+        F14 (or tray) → ⏸ Paused ↔ ✅ Ready
+        Tray "Exit" → Graceful shutdown
+    """
+
+    # Tray icon states
+    STATE_READY = "ready"
+    STATE_RECORDING = "recording"
+    STATE_PROCESSING = "processing"
+    STATE_PAUSED = "paused"
+
     def __init__(self, config):
         self.config = config
         self.is_recording = False
+        self.is_paused = False
         self.audio_buffer = []
         self.sample_rate = 16000
         self.stream = None
         self.formatter = SmartFormatter()
         self.model = None
-        
+        self.tray = None
+        self._stop_event = threading.Event()
+        self._state = self.STATE_READY
+
         # Load settings
         self.hotkey = config.get("hotkey", "f15")
+        self.pause_hotkey = config.get("pause_hotkey", "f14")
         self.language = config.get("language")
         self.model_size = config.get("model", "base")
         self.compute_type = config.get("compute_type", "int8")
@@ -553,35 +576,92 @@ class WhisperDictation:
         self.audio_threshold = config.get("audio_threshold", 0.01)
         self.initial_prompt = config.get("initial_prompt")
         self.user_profile = config.get("user_profile", {})
-        
+
         self._print_banner()
         self._load_model()
-    
+
+    # ---- Tray icon helpers ----
+
+    @staticmethod
+    def _create_icon_image(color: str, size: int = 64) -> Image.Image:
+        """Create a solid circle icon with the given color."""
+        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        margin = 4
+        draw.ellipse([margin, margin, size - margin, size - margin], fill=color)
+        return img
+
+    def _update_tray_state(self, state: str):
+        """Update tray icon and tooltip to reflect current state."""
+        self._state = state
+        color_map = {
+            self.STATE_READY: ("#22c55e", "Whisper Dictation — Ready"),       # green
+            self.STATE_RECORDING: ("#ef4444", "Whisper Dictation — Recording..."),  # red
+            self.STATE_PROCESSING: ("#f59e0b", "Whisper Dictation — Processing..."), # amber
+            self.STATE_PAUSED: ("#a3a3a3", "Whisper Dictation — Paused"),      # gray
+        }
+        color, tooltip = color_map.get(state, ("#22c55e", "Whisper Dictation"))
+        if self.tray:
+            self.tray.icon = self._create_icon_image(color)
+            self.tray.title = tooltip
+            # Rebuild menu to reflect pause/resume label
+            self.tray.menu = self._build_menu()
+
+    def _build_menu(self) -> pystray.Menu:
+        """Build the tray right-click menu."""
+        pause_label = "Resume" if self.is_paused else "Pause"
+        return pystray.Menu(
+            pystray.MenuItem(pause_label, self._on_toggle_pause),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem("Exit", self._on_exit),
+        )
+
+    def _on_toggle_pause(self, icon=None, item=None):
+        """Toggle pause/resume."""
+        self.is_paused = not self.is_paused
+        if self.is_paused:
+            print("⏸  Paused — hotkey disabled")
+            self._update_tray_state(self.STATE_PAUSED)
+        else:
+            print(f"✅ Resumed — hold '{self.hotkey.upper()}' to dictate")
+            self._update_tray_state(self.STATE_READY)
+
+    def _on_exit(self, icon=None, item=None):
+        """Graceful shutdown from tray."""
+        print("\n👋 Shutting down...")
+        self._stop_event.set()
+        if self.tray:
+            self.tray.stop()
+
+    # ---- Startup ----
+
     def _print_banner(self):
-        """Print startup banner"""
+        """Print startup banner."""
         print("\n" + "="*60)
         print("🎤 Universal Whisper Dictation")
         print("="*60)
         print(f"\n📋 Configuration:")
         print(f"   Hotkey: {self.hotkey.upper()}")
-        print(f"   Model: {self.model_size}")
+        print(f"   Pause:  {self.pause_hotkey.upper()}")
+        print(f"   Model:  {self.model_size}")
         print(f"   Device: {self.device.upper()}")
         print(f"   Language: {self.language or 'Auto-detect'}")
-        print(f"   Auto-punctuation: {'✓' if self.enable_punct else '✗'}")
-        print(f"   Smart formatting: {'✓' if self.enable_format else '✗'}")
-        print(f"   Auto-capitalization: {'✓' if self.enable_cap else '✗'}")
+        print(f"   Punctuation: {'✓' if self.enable_punct else '✗'}")
+        print(f"   Formatting:  {'✓' if self.enable_format else '✗'}")
+        print(f"   Capitals:    {'✓' if self.enable_cap else '✗'}")
         print(f"   Output: {self.output_mode}")
         print("\n" + "-"*60)
-        print(f"🎯 Instructions:")
-        print(f"   HOLD '{self.hotkey.upper()}' → Speak → RELEASE")
-        print(f"   Press 'ESC' to exit")
+        print(f"🎯 Controls:")
+        print(f"   HOLD '{self.hotkey.upper()}' → Speak → RELEASE to transcribe")
+        print(f"   Press '{self.pause_hotkey.upper()}' to pause/resume")
+        print(f"   Right-click tray icon → Exit")
         print("-"*60 + "\n")
-    
+
     def _load_model(self):
-        """Load Whisper model"""
+        """Load Whisper model."""
         print(f"⏳ Loading {self.model_size} model...")
         print("   (First run may download model files)")
-        
+
         try:
             self.model = WhisperModel(
                 self.model_size,
@@ -594,48 +674,53 @@ class WhisperDictation:
             print("   Falling back to CPU mode with base model...")
             self.model = WhisperModel("base", device="cpu", compute_type="int8")
             print(f"✅ Fallback model loaded!\n")
-    
+
+    # ---- Recording ----
+
     def audio_callback(self, indata, frames, time_info, status):
-        """Audio capture callback"""
+        """Audio capture callback."""
         if self.is_recording:
             self.audio_buffer.append(indata.copy())
-    
+
     def start_recording(self):
-        """Start recording"""
-        if self.is_recording:
+        """Start recording (hotkey pressed)."""
+        if self.is_recording or self.is_paused:
             return
-        
+
         self.audio_buffer = []
         self.is_recording = True
+        self._update_tray_state(self.STATE_RECORDING)
         print("🔴 Recording... (speak now)")
-    
+
     def stop_recording(self):
-        """Stop and process recording"""
+        """Stop and process recording (hotkey released)."""
         if not self.is_recording:
             return
-        
+
         self.is_recording = False
+        self._update_tray_state(self.STATE_PROCESSING)
         time.sleep(0.1)
-        
+
         if not self.audio_buffer:
             print("⚠️  No audio captured (hold key longer)\n")
+            self._update_tray_state(self.STATE_READY)
             return
-        
+
         audio_data = np.concatenate(self.audio_buffer, axis=0)
         duration = len(audio_data) / self.sample_rate
-        
+
         if duration < 0.5:
             print(f"⚠️  Recording too short ({duration:.1f}s)\n")
+            self._update_tray_state(self.STATE_READY)
             return
-        
+
         print(f"⏳ Processing {duration:.1f}s...", end=" ")
-        
+
         temp_path = os.path.join(tempfile.gettempdir(), "dictation_temp.wav")
-        
+
         try:
             wav_write(temp_path, self.sample_rate, (audio_data * 32767).astype(np.int16))
-            
-            # Transcription options
+
             options = {
                 "beam_size": 5 if self.model_size in ["large-v3", "large-v2", "large"] else 3,
                 "best_of": 5 if self.model_size in ["large-v3", "large-v2", "large"] else 3,
@@ -647,53 +732,54 @@ class WhisperDictation:
                     "max_speech_duration_s": duration + 1
                 }
             }
-            
+
             if self.initial_prompt:
                 options["initial_prompt"] = self.initial_prompt
-            
+
             segments, info = self.model.transcribe(temp_path, **options)
             text = " ".join([segment.text.strip() for segment in segments])
-            
+
             if text:
-                # Detect language and format
                 lang = self.formatter.detect_language(text)
                 formatted = self.formatter.format_text(
-                    text, 
+                    text,
                     lang=lang,
                     enable_punct=self.enable_punct,
                     enable_format=self.enable_format,
                     enable_cap=self.enable_cap
                 )
-                
+
                 print(f"✓ Done")
                 print(f"   Original: {text[:60]}{'...' if len(text) > 60 else ''}")
                 if formatted != text:
                     print(f"   Formatted: {formatted[:60]}{'...' if len(formatted) > 60 else ''}")
-                
-                # Output
+
                 self._output_text(formatted)
                 print()
             else:
                 print("⚠️  No speech detected\n")
-        
+
         except Exception as e:
             print(f"❌ Error: {e}\n")
-        
+
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
-    
+            self._update_tray_state(self.STATE_READY)
+
     def _output_text(self, text):
-        """Output text according to mode"""
+        """Output text according to mode."""
         if self.output_mode in ["clipboard", "both"]:
             pyperclip.copy(text)
-        
+
         if self.output_mode in ["type", "both"]:
             time.sleep(0.05)
             keyboard.write(text)
-    
-    def run(self):
-        """Main loop"""
+
+    # ---- Main loop ----
+
+    def _run_dictation_loop(self):
+        """Dictation engine running in a background thread."""
         self.stream = sd.InputStream(
             samplerate=self.sample_rate,
             channels=1,
@@ -701,19 +787,44 @@ class WhisperDictation:
             blocksize=1024
         )
         self.stream.start()
-        
+
         try:
             keyboard.on_press_key(self.hotkey, lambda _: self.start_recording())
             keyboard.on_release_key(self.hotkey, lambda _: self.stop_recording())
-            
-            print(f"✅ Ready! Hold '{self.hotkey.upper()}' to dictate...\n")
-            keyboard.wait("esc")
-        
+            keyboard.on_press_key(self.pause_hotkey, lambda _: self._on_toggle_pause())
+
+            print(f"✅ Ready! Hold '{self.hotkey.upper()}' to dictate...")
+            print(f"   Press '{self.pause_hotkey.upper()}' to pause/resume")
+            print(f"   Right-click tray icon → Exit\n")
+
+            # Wait until stop event is set (from tray Exit)
+            self._stop_event.wait()
+
         finally:
+            keyboard.unhook_all()
             self.stream.stop()
             self.stream.close()
-        
-        print("\n👋 Goodbye!")
+
+        print("👋 Goodbye!")
+
+    def run(self):
+        """Start the app with system tray icon."""
+        # Start dictation in background thread
+        engine_thread = threading.Thread(target=self._run_dictation_loop, daemon=True)
+        engine_thread.start()
+
+        # Create and run system tray (blocks on main thread)
+        self.tray = pystray.Icon(
+            "whisper-dictation",
+            self._create_icon_image("#22c55e"),
+            "Whisper Dictation — Ready",
+            menu=self._build_menu(),
+        )
+        self.tray.run()  # blocks until tray.stop() is called
+
+        # Ensure engine thread stops
+        self._stop_event.set()
+        engine_thread.join(timeout=3)
 
 
 def test_microphone():
@@ -754,22 +865,36 @@ def load_or_setup_config():
     return SetupWizard.run()
 
 
+def hide_console_window():
+    """Minimize the console window to system tray area."""
+    try:
+        hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+        if hwnd:
+            ctypes.windll.user32.ShowWindow(hwnd, 6)  # SW_MINIMIZE = 6
+    except Exception:
+        pass  # Not on Windows or no console
+
+
 def main():
-    """Main entry point"""
+    """Main entry point."""
     try:
         # Load or setup configuration
         config = load_or_setup_config()
-        
+
         # Test microphone
         if not test_microphone():
             print("Please check your microphone settings and try again.")
             input("\nPress Enter to exit...")
             return
-        
+
         # Start dictation
         app = WhisperDictation(config)
+
+        # Minimize console after model is loaded (user has seen the banner)
+        hide_console_window()
+
         app.run()
-    
+
     except KeyboardInterrupt:
         print("\n👋 Goodbye!")
     except Exception as e:

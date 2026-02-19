@@ -1,5 +1,6 @@
 {
   "hotkey": "f15",
+  "pause_hotkey": "f14",
   "language": null,
   "model": "large-v3",
   "compute_type": "float16",
