@@ -34,24 +34,52 @@ import pystray
 from PIL import Image, ImageDraw
 from settings_gui import open_settings
 
+try:
+    import winsound
+    HAS_WINSOUND = True
+except ImportError:
+    HAS_WINSOUND = False
+
 # ============ CONFIGURATION ============
 DEFAULT_CONFIG = {
     "hotkey": "f15",
+    "pause_hotkey": "f14",
     "language": None,
-    "model": "auto",  # 'auto' will detect based on device capability
-    "compute_type": "auto",  # 'auto' will detect GPU/CPU
-    "device": "auto",  # 'auto', 'cuda', 'cpu'
+    "model": "auto",
+    "compute_type": "auto",
+    "device": "auto",
     "enable_punctuation": True,
     "enable_formatting": True,
     "enable_capitalization": True,
     "max_line_length": 80,
-    "output_mode": "type",  # 'type', 'clipboard', 'both'
+    "output_mode": "type",
+    "sample_rate": 16000,
     "audio_threshold": 0.01,
+    "min_duration": 0.5,
+    "auto_minimize_console": True,
+    "sound_feedback": True,
     "initial_prompt": None,
+    "beam_size": 5,
+    "best_of": 5,
+    "temperature": [0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+    "condition_on_previous_text": True,
+    "repetition_penalty": 1.1,
+    "no_repeat_ngram_size": 3,
+    "no_speech_threshold": 0.6,
+    "log_prob_threshold": -1.0,
+    "compression_ratio_threshold": 2.4,
+    "hallucination_silence_threshold": 1.0,
+    "vad_filter": True,
+    "vad_parameters": {
+        "threshold": 0.5,
+        "min_silence_duration_ms": 300,
+        "min_speech_duration_ms": 250,
+        "max_speech_duration_s": 30
+    },
     "user_profile": {
         "name": "",
-        "primary_language": "auto",  # 'auto', 'zh', 'en', 'mixed'
-        "formality": "casual",  # 'casual', 'formal', 'business'
+        "primary_language": "auto",
+        "formality": "casual",
         "common_phrases": []
     }
 }
@@ -555,7 +583,6 @@ class WhisperDictation:
         self.is_recording = False
         self.is_paused = False
         self.audio_buffer = []
-        self.sample_rate = 16000
         self.stream = None
         self.formatter = SmartFormatter()
         self.model = None
@@ -563,34 +590,62 @@ class WhisperDictation:
         self._stop_event = threading.Event()
         self._state = self.STATE_READY
 
-        # Load settings
+        # Load all settings from config
+        self._load_config(config)
+
+        self._print_banner()
+        self._load_model()
+
+    def _load_config(self, config: dict):
+        """Load all settings from config dict."""
+        # Hotkeys
         self.hotkey = config.get("hotkey", "f15")
         self.pause_hotkey = config.get("pause_hotkey", "f14")
+
+        # Model & device
         self.language = config.get("language")
         self.model_size = config.get("model", "base")
         self.compute_type = config.get("compute_type", "int8")
         self.device = config.get("device", "cpu")
+
+        # Text processing
         self.enable_punct = config.get("enable_punctuation", True)
         self.enable_format = config.get("enable_formatting", True)
         self.enable_cap = config.get("enable_capitalization", True)
+        self.max_line_length = config.get("max_line_length", 80)
+
+        # Output & audio
         self.output_mode = config.get("output_mode", "type")
+        self.sample_rate = config.get("sample_rate", 16000)
         self.audio_threshold = config.get("audio_threshold", 0.01)
         self.min_duration = config.get("min_duration", 0.5)
+        self.auto_minimize = config.get("auto_minimize_console", True)
+        self.sound_feedback = config.get("sound_feedback", True)
         self.initial_prompt = config.get("initial_prompt")
         self.user_profile = config.get("user_profile", {})
 
-        # Advanced transcription settings
-        self.beam_size = config.get("beam_size")
-        self.best_of = config.get("best_of")
+        # Transcription (advanced)
+        self.beam_size = config.get("beam_size", 5)
+        self.best_of = config.get("best_of", 5)
+        self.temperature = config.get("temperature", [0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
         self.condition_on_prev = config.get("condition_on_previous_text", True)
+        self.repetition_penalty = config.get("repetition_penalty", 1.1)
+        self.no_repeat_ngram_size = config.get("no_repeat_ngram_size", 3)
+
+        # Quality thresholds
+        self.no_speech_threshold = config.get("no_speech_threshold", 0.6)
+        self.log_prob_threshold = config.get("log_prob_threshold", -1.0)
+        self.compression_ratio_threshold = config.get("compression_ratio_threshold", 2.4)
+        self.hallucination_silence_threshold = config.get("hallucination_silence_threshold", 1.0)
+
+        # VAD
         self.vad_filter = config.get("vad_filter", True)
         self.vad_parameters = config.get("vad_parameters", {
+            "threshold": 0.5,
             "min_silence_duration_ms": 300,
+            "min_speech_duration_ms": 250,
             "max_speech_duration_s": 30
         })
-
-        self._print_banner()
-        self._load_model()
 
     # ---- Tray icon helpers ----
 
@@ -653,21 +708,7 @@ class WhisperDictation:
     def _apply_config(self, new_config: dict):
         """Apply new config values live (where possible)."""
         self.config = new_config
-        self.enable_punct = new_config.get("enable_punctuation", True)
-        self.enable_format = new_config.get("enable_formatting", True)
-        self.enable_cap = new_config.get("enable_capitalization", True)
-        self.output_mode = new_config.get("output_mode", "type")
-        self.audio_threshold = new_config.get("audio_threshold", 0.01)
-        self.min_duration = new_config.get("min_duration", 0.5)
-        self.initial_prompt = new_config.get("initial_prompt")
-        self.beam_size = new_config.get("beam_size")
-        self.best_of = new_config.get("best_of")
-        self.condition_on_prev = new_config.get("condition_on_previous_text", True)
-        self.vad_filter = new_config.get("vad_filter", True)
-        self.vad_parameters = new_config.get("vad_parameters", {
-            "min_silence_duration_ms": 300,
-            "max_speech_duration_s": 30
-        })
+        self._load_config(new_config)
         print("⚙️  Settings updated (model/device changes need restart)")
 
     # ---- Startup ----
@@ -719,6 +760,16 @@ class WhisperDictation:
         if self.is_recording:
             self.audio_buffer.append(indata.copy())
 
+    def _play_beep(self, freq: int = 800, duration_ms: int = 100):
+        """Play a short beep sound for feedback."""
+        if self.sound_feedback and HAS_WINSOUND:
+            try:
+                threading.Thread(
+                    target=winsound.Beep, args=(freq, duration_ms), daemon=True
+                ).start()
+            except Exception:
+                pass
+
     def start_recording(self):
         """Start recording (hotkey pressed)."""
         if self.is_recording or self.is_paused:
@@ -727,6 +778,7 @@ class WhisperDictation:
         self.audio_buffer = []
         self.is_recording = True
         self._update_tray_state(self.STATE_RECORDING)
+        self._play_beep(800, 80)  # Short high beep = start
         print("🔴 Recording... (speak now)")
 
     def stop_recording(self):
@@ -758,11 +810,9 @@ class WhisperDictation:
         try:
             wav_write(temp_path, self.sample_rate, (audio_data * 32767).astype(np.int16))
 
-            # Use config values, falling back to model-size-based defaults
-            is_large = self.model_size in ["large-v3", "large-v2", "large"]
-            beam = self.beam_size if self.beam_size else (5 if is_large else 3)
-            best = self.best_of if self.best_of else (5 if is_large else 3)
+            self._play_beep(600, 80)  # Lower beep = processing
 
+            # Build transcription options from config
             vad_params = dict(self.vad_parameters)
             vad_params["max_speech_duration_s"] = max(
                 vad_params.get("max_speech_duration_s", 30),
@@ -770,13 +820,22 @@ class WhisperDictation:
             )
 
             options = {
-                "beam_size": beam,
-                "best_of": best,
+                "beam_size": self.beam_size,
+                "best_of": self.best_of,
+                "temperature": self.temperature,
                 "condition_on_previous_text": self.condition_on_prev,
+                "repetition_penalty": self.repetition_penalty,
+                "no_repeat_ngram_size": self.no_repeat_ngram_size,
+                "no_speech_threshold": self.no_speech_threshold,
+                "log_prob_threshold": self.log_prob_threshold,
+                "compression_ratio_threshold": self.compression_ratio_threshold,
                 "language": self.language,
                 "vad_filter": self.vad_filter,
                 "vad_parameters": vad_params,
             }
+
+            if self.hallucination_silence_threshold:
+                options["hallucination_silence_threshold"] = self.hallucination_silence_threshold
 
             if self.initial_prompt:
                 options["initial_prompt"] = self.initial_prompt
@@ -920,26 +979,23 @@ def hide_console_window():
         if hwnd:
             ctypes.windll.user32.ShowWindow(hwnd, 6)  # SW_MINIMIZE = 6
     except Exception:
-        pass  # Not on Windows or no console
+        pass
 
 
 def main():
     """Main entry point."""
     try:
-        # Load or setup configuration
         config = load_or_setup_config()
 
-        # Test microphone
         if not test_microphone():
             print("Please check your microphone settings and try again.")
             input("\nPress Enter to exit...")
             return
 
-        # Start dictation
         app = WhisperDictation(config)
 
-        # Minimize console after model is loaded (user has seen the banner)
-        hide_console_window()
+        if config.get("auto_minimize_console", True):
+            hide_console_window()
 
         app.run()
 
