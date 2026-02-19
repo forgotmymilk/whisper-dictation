@@ -1,0 +1,9 @@
+{
+  "hotkey": "f15",
+  "language": null,
+  "model": "large-v3",
+  "compute_type": "float16",
+  "enable_punctuation": true,
+  "enable_formatting": false,
+  "initial_prompt": "这是一段中文语音转文字的内容，包含标点符号。This is English text with punctuation."
+}

@@ -1,0 +1,22 @@
+# Faster-Whisper Dictation System
+# Optimized for RTX 4070 Ti Super with CUDA 12.1
+
+# Core transcription engine
+faster-whisper>=1.0.0
+
+# PyTorch with CUDA 12.1 (GPU acceleration)
+torch>=2.1.0
+torchvision>=0.16.0
+torchaudio>=2.1.0
+--index-url https://download.pytorch.org/whl/cu121
+
+# Real-time dictation dependencies
+sounddevice>=0.4.6
+keyboard>=0.13.5
+pyperclip>=1.8.2
+numpy>=1.24.0
+pyaudio>=0.2.13
+scipy>=1.11.0
+
+# Optional: For better audio processing
+webrtcvad>=2.0.10

@@ -1,0 +1,394 @@
+# VoicePro V1.0 - Development Task List
+
+**Total Duration:** 2 weeks  
+**Target Completion:** 2026-03-05  
+
+---
+
+## Week 1: Core Engine (Day 1-7)
+
+### Day 1-2: Project Setup & Whisper Integration
+
+#### Task 1.1: Project Structure
+- [ ] Create GitHub repository
+- [ ] Set up Python 3.11 virtual environment
+- [ ] Create directory structure:
+  ```
+  voicepro/
+  ├── src/
+  │   ├── __init__.py
+  │   ├── main.py
+  │   ├── core/
+  │   ├── ui/
+  │   ├── audio/
+  │   └── license/
+  ├── resources/
+  ├── tests/
+  ├── docs/
+  └── installer/
+  ```
+- [ ] Set up gitignore and requirements.txt
+- **Estimated:** 4 hours
+- **Priority:** 🔴 Critical
+
+#### Task 1.2: Whisper Engine Integration
+- [ ] Install faster-whisper and dependencies
+- [ ] Create `WhisperEngine` class
+- [ ] Implement model loading (lazy load on first use)
+- [ ] Add GPU detection and CUDA initialization
+- [ ] Create model download progress callback
+- [ ] Test transcription with sample audio
+- **Estimated:** 8 hours
+- **Priority:** 🔴 Critical
+- **Dependencies:** Task 1.1
+
+#### Task 1.3: Audio Processing Module
+- [ ] Install sounddevice and scipy
+- [ ] Create `AudioCapture` class
+- [ ] Implement audio recording with callback
+- [ ] Add microphone gain control
+- [ ] Implement audio format conversion (WAV export)
+- [ ] Create audio buffer management
+- **Estimated:** 6 hours
+- **Priority:** 🔴 Critical
+- **Dependencies:** Task 1.1
+
+---
+
+### Day 3-4: Hotkey System
+
+#### Task 2.1: Keyboard Hotkey Implementation
+- [ ] Install keyboard library
+- [ ] Create `HotkeyManager` class
+- [ ] Implement global hotkey registration
+- [ ] Add double-click detection (300ms window)
+- [ ] Handle hotkey conflicts detection
+- [ ] Create hotkey configuration persistence
+- **Estimated:** 6 hours
+- **Priority:** 🔴 Critical
+- **Dependencies:** Task 1.1
+
+#### Task 2.2: X-Mouse Integration
+- [ ] Download X-Mouse portable version
+- [ ] Create X-Mouse configuration profile
+- [ ] Implement auto-detection of mouse buttons
+- [ ] Create X-Mouse installation/launcher script
+- [ ] Test mouse side button integration
+- [ ] Add fallback for non-XMouse scenarios
+- **Estimated:** 8 hours
+- **Priority:** 🟡 High
+- **Dependencies:** Task 2.1
+
+#### Task 2.3: Hotkey Testing & Refinement
+- [ ] Create comprehensive hotkey test suite
+- [ ] Test different hotkey combinations
+- [ ] Test with various applications (Word, Chrome, etc.)
+- [ ] Measure response time (< 100ms target)
+- [ ] Handle edge cases (modifier key stuck, etc.)
+- **Estimated:** 4 hours
+- **Priority:** 🟡 High
+- **Dependencies:** Task 2.1, Task 2.2
+
+---
+
+### Day 5-7: System Tray UI
+
+#### Task 3.1: System Tray Implementation
+- [ ] Install PyQt6
+- [ ] Create `SystemTrayApp` class
+- [ ] Implement tray icon with state changes:
+  - 🔴 Recording state
+  - ⏳ Processing state  
+  - ✅ Ready state
+  - ⚠️ Warning state (low quota)
+- [ ] Add right-click context menu
+- [ ] Implement tooltip updates
+- **Estimated:** 8 hours
+- **Priority:** 🔴 Critical
+- **Dependencies:** Task 1.1
+
+#### Task 3.2: Settings Window
+- [ ] Create settings dialog UI
+- [ ] Implement hotkey configuration tab
+- [ ] Add microphone settings tab
+- [ ] Create language selection dropdown
+- [ ] Add usage statistics display
+- [ ] Implement settings persistence (config.json)
+- **Estimated:** 8 hours
+- **Priority:** 🟡 High
+- **Dependencies:** Task 3.1
+
+#### Task 3.3: Notification System
+- [ ] Implement toast notifications
+- [ ] Create quota warning messages
+- [ ] Add transcription complete feedback
+- [ ] Implement error notifications
+- [ ] Add sound effects (optional)
+- **Estimated:** 4 hours
+- **Priority:** 🟢 Medium
+- **Dependencies:** Task 3.1
+
+---
+
+## Week 2: Productization (Day 8-14)
+
+### Day 8-9: Installation Wizard
+
+#### Task 4.1: Installation Experience
+- [ ] Create installer workflow diagram
+- [ ] Implement GPU detection logic
+- [ ] Create microphone test dialog
+- [ ] Build hotkey configuration wizard
+- [ ] Add first-time tutorial (3-step)
+- [ ] Create completion screen
+- **Estimated:** 12 hours
+- **Priority:** 🔴 Critical
+- **Dependencies:** Week 1 tasks
+
+#### Task 4.2: X-Mouse Auto-Configuration
+- [ ] Create mouse detection logic
+- [ ] Implement X-Mouse silent installation
+- [ ] Build profile auto-import
+- [ ] Create side button mapping wizard
+- [ ] Add "Test your hotkey" feature
+- [ ] Handle X-Mouse already installed scenario
+- **Estimated:** 8 hours
+- **Priority:** 🟡 High
+- **Dependencies:** Task 4.1
+
+---
+
+### Day 10-11: License & Payment System
+
+#### Task 5.1: License Management
+- [ ] Implement device fingerprint generation
+- [ ] Create license file format (.vplic)
+- [ ] Build license validation logic
+- [ ] Add 14-day trial countdown
+- [ ] Create license activation flow
+- [ ] Implement offline grace period (3 days)
+- **Estimated:** 10 hours
+- **Priority:** 🔴 Critical
+
+#### Task 5.2: Usage Quota System
+- [ ] Create local usage tracking (JSON)
+- [ ] Implement daily quota check (60 minutes)
+- [ ] Add single-session limit (5 minutes)
+- [ ] Create quota reset logic (daily at midnight)
+- [ ] Build quota warning notifications
+- **Estimated:** 6 hours
+- **Priority:** 🔴 Critical
+- **Dependencies:** Task 5.1
+
+#### Task 5.3: Payment Integration
+- [ ] Set up Stripe/Alipay/WeChat Pay
+- [ ] Create payment page (embedded browser)
+- [ ] Implement webhook for license delivery
+- [ ] Add receipt/invoice generation
+- [ ] Create subscription management (cancel/renew)
+- **Estimated:** 8 hours
+- **Priority:** 🟡 High
+- **Dependencies:** Task 5.1
+
+#### Task 5.4: Paywall Triggers
+- [ ] Implement natural quota exceeded message
+- [ ] Create feature restriction prompts
+- [ ] Build weekly usage report with CTA
+- [ ] Add upgrade button in settings
+- [ ] Design non-intrusive notification style
+- **Estimated:** 4 hours
+- **Priority:** 🟡 High
+- **Dependencies:** Task 5.2
+
+---
+
+### Day 12-13: Testing & Bug Fixes
+
+#### Task 6.1: Functional Testing
+- [ ] Create test plan document
+- [ ] Test installation on clean Windows 10/11
+- [ ] Test with various NVIDIA GPUs
+- [ ] Test with different microphones
+- [ ] Test hotkey with 20+ applications
+- [ ] Test payment flow (sandbox mode)
+- **Estimated:** 10 hours
+- **Priority:** 🔴 Critical
+
+#### Task 6.2: Edge Cases & Bug Fixes
+- [ ] Handle no microphone scenario
+- [ ] Handle no GPU scenario (CPU fallback)
+- [ ] Handle insufficient disk space
+- [ ] Handle antivirus false positives
+- [ ] Fix discovered bugs
+- [ ] Performance optimization
+- **Estimated:** 8 hours
+- **Priority:** 🟡 High
+- **Dependencies:** Task 6.1
+
+#### Task 6.3: Documentation
+- [ ] Write user manual (help.md)
+- [ ] Create FAQ document
+- [ ] Write troubleshooting guide
+- [ ] Create tutorial videos (optional)
+- [ ] Prepare release notes
+- **Estimated:** 4 hours
+- **Priority:** 🟢 Medium
+
+---
+
+### Day 14: Packaging & Release
+
+#### Task 7.1: Application Packaging
+- [ ] Configure PyInstaller spec file
+- [ ] Optimize binary size
+- [ ] Add version info and icon
+- [ ] Test packaged application
+- [ ] Create portable version (optional)
+- **Estimated:** 6 hours
+- **Priority:** 🔴 Critical
+
+#### Task 7.2: Installer Creation
+- [ ] Configure Inno Setup script
+- [ ] Add X-Mouse bundling
+- [ ] Implement VC++ redist check
+- [ ] Create uninstaller
+- [ ] Test installer on clean VMs
+- [ ] Digital signing (if available)
+- **Estimated:** 6 hours
+- **Priority:** 🔴 Critical
+- **Dependencies:** Task 7.1
+
+#### Task 7.3: Release Preparation
+- [ ] Create GitHub release
+- [ ] Write release notes
+- [ ] Prepare website download page
+- [ ] Set up analytics tracking
+- [ ] Create support email
+- [ ] Prepare social media announcement
+- **Estimated:** 4 hours
+- **Priority:** 🟡 High
+- **Dependencies:** Task 7.2
+
+---
+
+## Post-MVP Tasks (V1.1)
+
+### V1.1 Features (Week 3-4)
+
+#### Feature 8.1: GPT Smart Formatting
+- [ ] Integrate OpenAI API (optional)
+- [ ] Create formatting templates
+- [ ] Implement text post-processing
+- [ ] Add formatting style options
+- **Priority:** 🟡 High
+
+#### Feature 8.2: Usage Dashboard
+- [ ] Create statistics visualization
+- [ ] Add weekly/monthly reports
+- [ ] Implement data export
+- **Priority:** 🟢 Medium
+
+#### Feature 8.3: Custom Vocabulary
+- [ ] Implement personal dictionary
+- [ ] Add word replacement rules
+- [ ] Create import/export functionality
+- **Priority:** 🟢 Medium
+
+#### Feature 8.4: Audio Enhancement
+- [ ] Add noise reduction
+- [ ] Implement VAD parameters
+- [ ] Add audio preprocessing options
+- **Priority:** 🟢 Medium
+
+---
+
+## Bug Tracking Template
+
+```markdown
+### Bug Report Template
+
+**Title:** [Brief description]
+**Priority:** 🔴 Critical / 🟡 High / 🟢 Medium
+**Status:** Open / In Progress / Resolved
+
+**Description:**
+[Detailed description of the bug]
+
+**Steps to Reproduce:**
+1. [Step 1]
+2. [Step 2]
+3. [Step 3]
+
+**Expected Behavior:**
+[What should happen]
+
+**Actual Behavior:**
+[What actually happens]
+
+**Environment:**
+- OS: [Windows 10/11]
+- GPU: [NVIDIA model]
+- Version: [VoicePro version]
+
+**Screenshots/Logs:**
+[If applicable]
+```
+
+---
+
+## Resource Requirements
+
+### Development Environment
+- Windows 10/11 development machine
+- NVIDIA GPU (RTX 4070 Ti for testing)
+- Python 3.11
+- Visual Studio Community (for C++ dependencies)
+- Git and GitHub account
+
+### Third-Party Services
+- Stripe account (payment processing)
+- Alipay/WeChat Pay merchant account (China)
+- Cloud server (VPS for license API) - ¥50/month
+- Domain name - ¥50/year
+
+### Assets Needed
+- Application icon (256x256, 128x128, 64x64, 32x32)
+- System tray icons (colored states)
+- Website design (landing page)
+- Tutorial graphics/animations
+
+---
+
+## Risk Mitigation
+
+| Risk | Probability | Impact | Mitigation |
+|------|-------------|--------|------------|
+| Whisper model download fails | Medium | High | Mirror servers, offline installer option |
+| CUDA compatibility issues | Medium | High | CPU fallback mode, clear requirements |
+| Antivirus false positive | High | Medium | Code signing, whitelist submission |
+| X-Mouse licensing issue | Low | High | Include license file, contact author |
+| Payment gateway issues | Low | High | Multiple payment options, manual fallback |
+
+---
+
+## Success Criteria
+
+### V1.0 Launch Criteria
+- [ ] All Week 1 & 2 tasks completed
+- [ ] Zero critical bugs
+- [ ] Installation success rate > 95%
+- [ ] Basic functionality test passed
+- [ ] Payment flow verified in sandbox
+
+### 30-Day Post-Launch
+- [ ] 100+ downloads
+- [ ] 50+ active users
+- [ ] 5+ paying customers
+- [ ] < 5% crash rate
+- [ ] User feedback collected
+
+---
+
+**Task List Owner:** Development Team  
+**Last Updated:** 2026-02-19  
+**Next Review:** Weekly

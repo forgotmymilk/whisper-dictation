@@ -1,0 +1,22 @@
+{
+  "hotkey": "f15",
+  "language": null,
+  "model": "large-v3",
+  "compute_type": "float16",
+  "microphone_gain": 2.0,
+  "noise_threshold": 0.01,
+  "auto_punctuation": true,
+  "auto_format": false,
+  "format_prompt": "Format this transcribed speech into clear, reader-friendly text with proper paragraphs and punctuation:",
+  "format_style": "natural",
+  "beam_size": 5,
+  "best_of": 5,
+  "condition_on_previous_text": true,
+  "min_duration": 0.5,
+  "vad_filter": true,
+  "vad_parameters": {
+    "threshold": 0.5,
+    "min_speech_duration_ms": 250,
+    "max_speech_duration_s": 30
+  }
+}

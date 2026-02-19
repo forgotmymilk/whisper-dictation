@@ -1,0 +1,20 @@
+{
+  "hotkey": "f15",
+  "language": null,
+  "model": "large-v3",
+  "compute_type": "float16",
+  "device": "cuda",
+  "enable_punctuation": true,
+  "enable_formatting": true,
+  "enable_capitalization": true,
+  "max_line_length": 80,
+  "output_mode": "both",
+  "audio_threshold": 0.01,
+  "initial_prompt": null,
+  "user_profile": {
+    "name": "",
+    "primary_language": "auto",
+    "formality": "business",
+    "common_phrases": []
+  }
+}
