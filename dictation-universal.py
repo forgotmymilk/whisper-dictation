@@ -32,6 +32,7 @@ import tempfile
 
 import pystray
 from PIL import Image, ImageDraw
+from settings_gui import open_settings
 
 # ============ CONFIGURATION ============
 DEFAULT_CONFIG = {
@@ -623,6 +624,7 @@ class WhisperDictation:
         pause_label = "Resume" if self.is_paused else "Pause"
         return pystray.Menu(
             pystray.MenuItem(pause_label, self._on_toggle_pause),
+            pystray.MenuItem("Settings...", self._on_settings),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Exit", self._on_exit),
         )
@@ -643,6 +645,30 @@ class WhisperDictation:
         self._stop_event.set()
         if self.tray:
             self.tray.stop()
+
+    def _on_settings(self, icon=None, item=None):
+        """Open settings GUI."""
+        open_settings(self.config, on_save=self._apply_config)
+
+    def _apply_config(self, new_config: dict):
+        """Apply new config values live (where possible)."""
+        self.config = new_config
+        self.enable_punct = new_config.get("enable_punctuation", True)
+        self.enable_format = new_config.get("enable_formatting", True)
+        self.enable_cap = new_config.get("enable_capitalization", True)
+        self.output_mode = new_config.get("output_mode", "type")
+        self.audio_threshold = new_config.get("audio_threshold", 0.01)
+        self.min_duration = new_config.get("min_duration", 0.5)
+        self.initial_prompt = new_config.get("initial_prompt")
+        self.beam_size = new_config.get("beam_size")
+        self.best_of = new_config.get("best_of")
+        self.condition_on_prev = new_config.get("condition_on_previous_text", True)
+        self.vad_filter = new_config.get("vad_filter", True)
+        self.vad_parameters = new_config.get("vad_parameters", {
+            "min_silence_duration_ms": 300,
+            "max_speech_duration_s": 30
+        })
+        print("⚙️  Settings updated (model/device changes need restart)")
 
     # ---- Startup ----
 
