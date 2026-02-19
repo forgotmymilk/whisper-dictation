@@ -55,7 +55,7 @@ DEFAULT_CONFIG = {
     }
 }
 
-CONFIG_FILE = "user-config.json"
+CONFIG_FILE = "config.json"
 DEVICE_PROFILE_FILE = "device-profile.json"
 
 # Language detection patterns
@@ -574,8 +574,19 @@ class WhisperDictation:
         self.enable_cap = config.get("enable_capitalization", True)
         self.output_mode = config.get("output_mode", "type")
         self.audio_threshold = config.get("audio_threshold", 0.01)
+        self.min_duration = config.get("min_duration", 0.5)
         self.initial_prompt = config.get("initial_prompt")
         self.user_profile = config.get("user_profile", {})
+
+        # Advanced transcription settings
+        self.beam_size = config.get("beam_size")
+        self.best_of = config.get("best_of")
+        self.condition_on_prev = config.get("condition_on_previous_text", True)
+        self.vad_filter = config.get("vad_filter", True)
+        self.vad_parameters = config.get("vad_parameters", {
+            "min_silence_duration_ms": 300,
+            "max_speech_duration_s": 30
+        })
 
         self._print_banner()
         self._load_model()
@@ -709,7 +720,7 @@ class WhisperDictation:
         audio_data = np.concatenate(self.audio_buffer, axis=0)
         duration = len(audio_data) / self.sample_rate
 
-        if duration < 0.5:
+        if duration < self.min_duration:
             print(f"⚠️  Recording too short ({duration:.1f}s)\n")
             self._update_tray_state(self.STATE_READY)
             return
@@ -721,16 +732,24 @@ class WhisperDictation:
         try:
             wav_write(temp_path, self.sample_rate, (audio_data * 32767).astype(np.int16))
 
+            # Use config values, falling back to model-size-based defaults
+            is_large = self.model_size in ["large-v3", "large-v2", "large"]
+            beam = self.beam_size if self.beam_size else (5 if is_large else 3)
+            best = self.best_of if self.best_of else (5 if is_large else 3)
+
+            vad_params = dict(self.vad_parameters)
+            vad_params["max_speech_duration_s"] = max(
+                vad_params.get("max_speech_duration_s", 30),
+                duration + 1
+            )
+
             options = {
-                "beam_size": 5 if self.model_size in ["large-v3", "large-v2", "large"] else 3,
-                "best_of": 5 if self.model_size in ["large-v3", "large-v2", "large"] else 3,
-                "condition_on_previous_text": True,
+                "beam_size": beam,
+                "best_of": best,
+                "condition_on_previous_text": self.condition_on_prev,
                 "language": self.language,
-                "vad_filter": True,
-                "vad_parameters": {
-                    "min_silence_duration_ms": 300,
-                    "max_speech_duration_s": duration + 1
-                }
+                "vad_filter": self.vad_filter,
+                "vad_parameters": vad_params,
             }
 
             if self.initial_prompt:
@@ -773,8 +792,11 @@ class WhisperDictation:
             pyperclip.copy(text)
 
         if self.output_mode in ["type", "both"]:
+            # Replace newlines with spaces to avoid triggering Enter
+            # in chat apps (Slack, Teams, WeChat, etc.)
+            safe_text = text.replace("\n\n", " ").replace("\n", " ")
             time.sleep(0.05)
-            keyboard.write(text)
+            keyboard.write(safe_text)
 
     # ---- Main loop ----
 

@@ -1,10 +1,33 @@
 {
+  "_comment": "Whisper Dictation - Complete Configuration",
   "hotkey": "f15",
   "pause_hotkey": "f14",
   "language": null,
   "model": "large-v3",
   "compute_type": "float16",
+  "device": "cuda",
   "enable_punctuation": true,
   "enable_formatting": false,
-  "initial_prompt": "这是一段中文语音转文字的内容，包含标点符号。This is English text with punctuation."
+  "enable_capitalization": true,
+  "max_line_length": 80,
+  "output_mode": "type",
+  "audio_threshold": 0.01,
+  "min_duration": 0.5,
+  "initial_prompt": "这是一段中文语音转文字的内容，包含标点符号。This is English text with punctuation.",
+  "beam_size": 5,
+  "best_of": 5,
+  "condition_on_previous_text": true,
+  "vad_filter": true,
+  "vad_parameters": {
+    "min_silence_duration_ms": 300,
+    "max_speech_duration_s": 30,
+    "threshold": 0.5,
+    "min_speech_duration_ms": 250
+  },
+  "user_profile": {
+    "name": "",
+    "primary_language": "auto",
+    "formality": "business",
+    "common_phrases": []
+  }
 }
