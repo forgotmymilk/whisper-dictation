@@ -20,6 +20,7 @@ import pyperclip
 import time
 import json
 import os
+import sys
 import re
 import platform
 import subprocess
@@ -32,7 +33,6 @@ import tempfile
 
 import pystray
 from PIL import Image, ImageDraw
-from settings_gui import open_settings
 
 try:
     import winsound
@@ -702,8 +702,30 @@ class WhisperDictation:
             self.tray.stop()
 
     def _on_settings(self, icon=None, item=None):
-        """Open settings GUI."""
-        open_settings(self.config, on_save=self._apply_config)
+        """open settings GUI as subprocess."""
+        try:
+            # Launch settings_gui.py in a separate process
+            # This avoids threading conflicts with tkinter
+            cmd = [sys.executable, "settings_gui.py"]
+            self._settings_process = subprocess.Popen(cmd, cwd=os.path.dirname(os.path.abspath(__file__)))
+            
+            # Start a thread to wait for it to close, then reload config
+            threading.Thread(target=self._monitor_settings, daemon=True).start()
+        except Exception as e:
+            print(f"❌ Failed to launch settings: {e}")
+
+    def _monitor_settings(self):
+        """Wait for settings process to close, then reload config."""
+        if hasattr(self, '_settings_process'):
+            self._settings_process.wait()
+            # Reload config
+            try:
+                if os.path.exists(CONFIG_FILE):
+                    with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                        new_config = json.load(f)
+                    self._apply_config(new_config)
+            except Exception as e:
+                print(f"❌ Failed to reload config: {e}")
 
     def _apply_config(self, new_config: dict):
         """Apply new config values live (where possible)."""

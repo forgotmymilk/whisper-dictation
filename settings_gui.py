@@ -8,7 +8,6 @@ with rounded corners, smooth switches, and segmented controls.
 
 import json
 import os
-import threading
 import tkinter as tk
 import customtkinter as ctk
 
@@ -79,7 +78,7 @@ COLORS = {
     "border": "#2a2a4a",
     "accent": "#6c5ce7",
     "accent_hover": "#7c6cf7",
-    "accent_glow": "#6c5ce720",
+    "accent_glow": "#2a2a4a",  # Replaced alpha glow with solid dark blue
     "text": "#e8e8f0",
     "text_dim": "#8888aa",
     "text_muted": "#555577",
@@ -547,17 +546,6 @@ class SettingsApp(ctk.CTk):
             tk.messagebox.showerror("Invalid Value", f"Check your inputs:\n{e}")
         except Exception as e:
             tk.messagebox.showerror("Error", f"Save failed: {e}")
-
-
-# ============ PUBLIC API ============
-
-def open_settings(config: dict, on_save=None):
-    """Open settings window in a new thread (non-blocking)."""
-    def _run():
-        app = SettingsApp(config, on_save=on_save)
-        app.mainloop()
-    t = threading.Thread(target=_run, daemon=True)
-    t.start()
 
 
 if __name__ == "__main__":
