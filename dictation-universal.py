@@ -672,6 +672,8 @@ class WhisperDictation:
         self.tray = None
         self._stop_event = threading.Event()
         self._state = self.STATE_READY
+        self._last_audio_callback_time = time.time()
+        self._stream_error_count = 0
 
         # Load all settings from config
         self._load_config(config)
@@ -863,6 +865,11 @@ class WhisperDictation:
 
     def audio_callback(self, indata, frames, time_info, status):
         """Audio capture callback."""
+        self._last_audio_callback_time = time.time()
+        if status:
+            self._stream_error_count += 1
+            if self._stream_error_count <= 3:
+                print(f"⚠️  Audio stream warning: {status}")
         if self.is_recording:
             self.audio_buffer.append(indata.copy())
 
@@ -1000,15 +1007,80 @@ class WhisperDictation:
 
     # ---- Main loop ----
 
+    def _open_audio_stream(self):
+        """Open (or reopen) the audio input stream in shared mode."""
+        try:
+            if self.stream is not None:
+                try:
+                    self.stream.stop()
+                    self.stream.close()
+                except Exception:
+                    pass
+
+            extra_settings = None
+            try:
+                # Force WASAPI shared mode so games can't steal exclusive access
+                extra_settings = sd.WasapiSettings(exclusive=False)
+            except Exception:
+                pass  # Not on Windows or sounddevice too old
+
+            kwargs = {
+                "samplerate": self.sample_rate,
+                "channels": 1,
+                "callback": self.audio_callback,
+                "blocksize": 1024,
+            }
+            if extra_settings:
+                kwargs["extra_settings"] = extra_settings
+
+            self.stream = sd.InputStream(**kwargs)
+            self.stream.start()
+            self._last_audio_callback_time = time.time()
+            self._stream_error_count = 0
+            return True
+        except Exception as e:
+            print(f"❌ Failed to open audio stream: {e}")
+            return False
+
+    def _stream_watchdog(self):
+        """Monitor audio stream health; restart if it dies."""
+        TIMEOUT = 5  # seconds of silence before restart
+        while not self._stop_event.is_set():
+            self._stop_event.wait(3)  # check every 3 seconds
+            if self._stop_event.is_set():
+                break
+            elapsed = time.time() - self._last_audio_callback_time
+            if elapsed > TIMEOUT:
+                print(f"\n⚠️  Audio stream appears dead ({elapsed:.0f}s no callbacks). Restarting...")
+                if self._open_audio_stream():
+                    print("✅ Audio stream restarted successfully.")
+                else:
+                    print("❌ Audio stream restart failed. Will retry...")
+
+    def _hook_watchdog(self):
+        """Periodically re-register keyboard hooks in case a game unhooks them."""
+        while not self._stop_event.is_set():
+            self._stop_event.wait(10)  # check every 10 seconds
+            if self._stop_event.is_set():
+                break
+            try:
+                keyboard.unhook_all()
+                keyboard.on_press_key(self.hotkey, lambda _: self.start_recording())
+                keyboard.on_release_key(self.hotkey, lambda _: self.stop_recording())
+                keyboard.on_press_key(self.pause_hotkey, lambda _: self._on_toggle_pause())
+            except Exception as e:
+                print(f"⚠️  Hook refresh error: {e}")
+
     def _run_dictation_loop(self):
         """Dictation engine running in a background thread."""
-        self.stream = sd.InputStream(
-            samplerate=self.sample_rate,
-            channels=1,
-            callback=self.audio_callback,
-            blocksize=1024
-        )
-        self.stream.start()
+        if not self._open_audio_stream():
+            print("❌ Cannot start without audio. Exiting.")
+            self._stop_event.set()
+            return
+
+        # Start watchdog threads
+        threading.Thread(target=self._stream_watchdog, daemon=True).start()
+        threading.Thread(target=self._hook_watchdog, daemon=True).start()
 
         try:
             keyboard.on_press_key(self.hotkey, lambda _: self.start_recording())
@@ -1024,8 +1096,9 @@ class WhisperDictation:
 
         finally:
             keyboard.unhook_all()
-            self.stream.stop()
-            self.stream.close()
+            if self.stream:
+                self.stream.stop()
+                self.stream.close()
 
         print("👋 Goodbye!")
 
