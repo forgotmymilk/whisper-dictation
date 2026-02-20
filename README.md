@@ -1,255 +1,289 @@
-# Whisper Dictation System
+# Universal Whisper Dictation 🎤
 
-> **Personal Daily Driver** — This is the stable, personal-use version for everyday dictation.
-> For the commercial product (VoicePro), see [`D:\GAG\projects\voicepro`](file:///D:/GAG/projects/voicepro).
+A portable, user-friendly voice dictation system with smart formatting for Chinese, English, and mixed-language input.
 
-Real-time speech-to-text dictation for Windows with RTX 4070 Ti Super GPU acceleration.
+## 🌟 Features
 
-**Location:** `D:\GAG\projects\whisper-dictation`
+### Multi-Language Support
+- **Chinese**: Auto punctuation (，。！？), smart paragraph breaks
+- **English**: Auto punctuation, smart capitalization, sentence breaks
+- **Mixed**: Optimized spacing between Chinese and English
 
----
+### Smart Formatting
+- **Auto Punctuation**: Adds appropriate punctuation based on context
+- **Smart Capitalization**: Capitalizes first word of sentences and proper nouns
+- **Layout Optimization**: Breaks long text into readable paragraphs
+- **Language Spacing**: Adds proper spacing between Chinese and English
 
-## Quick Start
+### Universal Compatibility
+- **Auto Detection**: Automatically detects GPU/CPU capability
+- **Flexible Hardware**: Works on high-end GPUs to integrated graphics
+- **Portable**: No admin rights required, runs from any folder
+- **Cross-Device**: Easy migration between computers
 
-### 1. Install (First Time Only)
-```batch
-install.bat
-```
+### User-Friendly
+- **Setup Wizard**: Interactive configuration for non-technical users
+- **Visual Feedback**: Clear indicators for recording/processing
+- **Customizable**: Profile-based settings for different users
 
-### 2. Test Setup
-```batch
-test-setup.bat
-```
+## 🚀 Quick Start
 
-### 3. Start Dictating
-```batch
-start-dictation.bat
-```
+### First Time Setup
 
-**Controls:**
-- **HOLD F15** (default) → Speak → **RELEASE** to transcribe and auto-type
-- **ESC** to exit
+1. **Download** the project folder
+2. **Double-click** `portable-setup.bat`
+3. **Wait** for installation (5-10 minutes)
+4. **Double-click** `start-universal.bat`
+5. **Follow** the interactive setup wizard
+6. **Start** dictating!
 
----
+### Daily Use
 
-## X-Mouse Button Control Setup
+Simply double-click `start-universal.bat` and:
+- **HOLD** your configured hotkey (default: F15)
+- **SPEAK** naturally in Chinese, English, or mixed
+- **RELEASE** to transcribe and auto-type
+- Press **ESC** to exit
 
-Since the hotkey is changed from Print Screen to **F15**, you can map any mouse button to trigger it:
+## ⚙️ Configuration
 
-### Setup Steps:
+### Setup Wizard (Recommended)
 
-1. **Open X-Mouse Button Control**
-2. **Select your application profile** (or Global)
-3. **Click the mouse button** you want to use
-4. **Choose "Simulated Keys"**
-5. **Enter:** `{F15}`
-6. **Set mode:** "Pressed" (for push-to-talk behavior)
-7. **Click OK**
+The setup wizard runs automatically on first launch:
+- **Language preference**: Chinese/English/Mixed
+- **Text style**: Casual/Formal/Business
+- **Hotkey configuration**: Customize your trigger key
+- **Feature toggles**: Enable/disable punctuation, formatting
 
-### Alternative Hotkeys:
+### Manual Configuration
 
-Edit `config.json`:
-
-```json
-{
-  "hotkey": "f16",
-  "language": null,
-  "model": "large-v3",
-  "compute_type": "float16"
-}
-```
-
-**X-Mouse Compatible Keys:**
-- `f15`, `f16`, `f17`, `f18`, `f19`, `f20` - Best choice (rarely used)
-- `ctrl+shift+d` - Key combination
-- `insert`, `pause`, `scroll lock` - Dedicated keys
-
-**Recommended:** Use F15-F20 - these keys exist virtually and won't conflict with any software.
-
----
-
-## File Structure
-
-```
-whisper-dictation/
-├── .venv/                      # Virtual environment (created by install.bat)
-├── install.bat                 # First-time setup
-├── start-dictation.bat        # Launch dictation mode
-├── start-transcribe.bat       # Launch file transcription
-├── test-setup.bat             # Verify installation
-├── dictation.py               # Real-time dictation script
-├── transcribe.py              # File transcription script
-├── test_setup.py              # Installation tester
-├── config.json                # Hotkey and settings
-└── requirements.txt           # Python dependencies
-```
-
----
-
-## Portability (Reusable After Reinstall)
-
-This folder is **completely portable**:
-
-### Backup:
-Simply copy the entire `whisper-dictation` folder to:
-- External drive
-- Cloud storage (OneDrive, Dropbox)
-- Network drive
-
-### Restore on New System:
-1. Copy folder to same location: `D:\GAG\projects\whisper-dictation`
-2. Run `install.bat` (recreates virtual environment)
-3. Done!
-
-**Note:** Models are downloaded on first run (~3GB) and cached in:
-- `%USERPROFILE%\.cache\whisper` (model files)
-
----
-
-## Configuration
-
-### config.json Options:
+Edit `user-config.json`:
 
 ```json
 {
   "hotkey": "f15",
   "language": null,
-  "model": "large-v3",
-  "compute_type": "float16"
+  "model": "auto",
+  "compute_type": "auto",
+  "device": "auto",
+  "enable_punctuation": true,
+  "enable_formatting": true,
+  "enable_capitalization": true,
+  "output_mode": "type"
 }
 ```
 
+### Configuration Options
+
 | Option | Values | Description |
 |--------|--------|-------------|
-| `hotkey` | `"f15"`, `"f16"`, `"ctrl+shift+d"`, etc. | Trigger key |
-| `language` | `null` (auto), `"zh"` (Chinese), `"en"` (English) | Language |
-| `model` | `"tiny"`, `"base"`, `"medium"`, `"large-v3"` | Model size |
-| `compute_type` | `"float16"`, `"int8"` | GPU precision |
+| `hotkey` | `"f15"`, `"ctrl+shift+d"`, etc. | Trigger key |
+| `language` | `null`, `"zh"`, `"en"` | Language (null=auto) |
+| `model` | `"auto"`, `"tiny"` to `"large-v3"` | Whisper model size |
+| `device` | `"auto"`, `"cuda"`, `"cpu"` | Processing device |
+| `enable_punctuation` | `true`, `false` | Auto-add punctuation |
+| `enable_formatting` | `true`, `false` | Smart layout formatting |
+| `enable_capitalization` | `true`, `false` | Auto-capitalize English |
+| `output_mode` | `"type"`, `"clipboard"`, `"both"` | Output destination |
 
-### Model Performance (RTX 4070 Ti Super):
+## 📝 Formatting Examples
 
-| Model | Delay | VRAM | Accuracy |
-|-------|-------|------|----------|
-| tiny | <0.5s | ~1GB | Basic |
-| base | ~0.5s | ~1GB | Decent |
-| medium | ~1s | ~5GB | Very Good |
-| **large-v3** | **1-2s** | **~10GB** | **Excellent** |
-
-**Recommendation:** Use large-v3 for maximum accuracy (ideal for Chinese + English mixed speech).
-
----
-
-## Language Settings
-
-### Auto-Detect (Default):
-```json
-"language": null
+### Chinese Input
+```
+Input:  今天天气真好啊我要去公园玩然后回家吃饭
+Output: 今天天气真好啊！我要去公园玩，然后回家吃饭。
 ```
 
-### Force Chinese:
-```json
-"language": "zh"
+### English Input
+```
+Input:  hello today is a great day i want to go to the park
+Output: Hello. Today is a great day. I want to go to the park.
 ```
 
-### Force English:
-```json
-"language": "en"
+### Mixed Input
+```
+Input:  我有5个apple和3个banana today is great
+Output: 我有 5 个 apple 和 3 个 banana. Today is great.
 ```
 
----
+### Long Text
+```
+Input:  首先我们要准备工作然后检查设备最后开始录音
+Output: 首先，我们要准备工作。
+       然后，检查设备。
+       最后，开始录音。
+```
 
-## Troubleshooting
+## 🖱️ Mouse Integration (X-Mouse Button Control)
+
+Map any mouse button to your hotkey:
+
+1. Download and install [X-Mouse Button Control](https://www.highrez.co.uk/downloads/xmousebuttoncontrol.htm)
+2. Open X-Mouse and select your mouse
+3. Click the button you want to use
+4. Select "Simulated Keys"
+5. Enter: `{F15}` (or your configured hotkey)
+6. Set mode to "Pressed"
+7. Click OK
+
+**Recommended hotkeys for mouse:** F15, F16, F17, F18, F19, F20 (virtual keys, no conflicts)
+
+## 💾 Portability
+
+### Backup
+Simply copy the entire folder to:
+- External drive
+- Cloud storage (OneDrive, Dropbox)
+- USB stick
+
+### Restore on New Computer
+1. Copy folder to new computer
+2. Delete `device-profile.json` (forces re-detection)
+3. Run `start-universal.bat`
+4. The setup wizard will reconfigure for new hardware
+
+### Files to Keep
+- `user-config.json` - Your personal settings
+- `dictation-universal.py` - Main program
+- `.venv/` folder - Python environment
+
+### Files Safe to Delete
+- `device-profile.json` - Auto-regenerated
+- Model cache in `%USERPROFILE%\.cache\whisper`
+
+## 🖥️ System Requirements
+
+### Minimum (CPU Mode)
+- Windows 10/11
+- 4GB RAM
+- Microphone
+- Python 3.8+
+
+### Recommended (GPU Mode)
+- Windows 10/11
+- NVIDIA GPU with 2GB+ VRAM
+- 8GB RAM
+- Microphone
+- CUDA-capable GPU
+
+### Optimal (High Performance)
+- Windows 10/11
+- RTX 3060 or better (6GB+ VRAM)
+- 16GB RAM
+- Quality microphone
+- SSD storage
+
+## 🔧 Troubleshooting
 
 ### "Virtual environment not found"
-Run `install.bat` first.
+Run `portable-setup.bat` first
 
 ### "CUDA not available"
-```batch
-.venv\Scripts\activate.bat
-python -c "import torch; print(torch.cuda.is_available())"
-```
-If False, reinstall:
+The system automatically falls back to CPU mode. For GPU support:
 ```batch
 .venv\Scripts\activate.bat
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 ```
 
-### "No module named 'faster_whisper'"
-Run `install.bat` to install all dependencies.
+### "Microphone not detected"
+1. Windows Settings → Privacy → Microphone
+2. Enable "Allow apps to access microphone"
+3. Set your microphone as default recording device
 
-### Microphone not detected
-1. Windows Settings → Privacy → Microphone → Allow apps to access microphone
-2. Set your microphone as default recording device
+### "Hotkey not working"
+1. Try a different hotkey in config
+2. Run as administrator (if keyboard library fails)
+3. Check if antivirus is blocking keyboard hooks
 
-### Hotkey not working
-1. Check X-Mouse is sending the correct key
-2. Verify config.json has correct hotkey name
-3. Try a different hotkey (F16, F17, etc.)
-
-### Low accuracy
-1. Check microphone quality (use headset or dedicated mic)
+### "Low accuracy"
+1. Use a better microphone (headset recommended)
 2. Speak clearly and at normal pace
-3. Ensure using large-v3 model
-4. Try forcing language: `"language": "zh"`
+3. Switch to larger model in config
+4. Check microphone input levels
 
----
+### "Slow performance"
+1. Use a smaller model (medium → small → base)
+2. Switch to int8 compute type
+3. Close other GPU-intensive applications
+4. Consider CPU mode for non-RTX GPUs
 
-## Privacy
+## 🎯 Tips for Best Results
+
+### Chinese Input
+- Speak naturally, system handles punctuation
+- Use "首先、其次、然后" for automatic paragraph breaks
+- System adds appropriate spacing around English words
+
+### English Input
+- The system capitalizes sentence starts
+- "I" is automatically capitalized
+- Proper nouns may need manual correction
+
+### Mixed Input
+- Seamlessly switch between languages
+- System optimizes spacing automatically
+- Best with large-v3 model
+
+### Performance Optimization
+- **Fastest**: tiny model, CPU, no formatting
+- **Balanced**: base/small model, GPU, basic formatting
+- **Best Quality**: large-v3 model, GPU, full formatting
+
+## 📁 File Structure
+
+```
+whisper-dictation/
+├── dictation-universal.py      # Main program
+├── start-universal.bat         # Launch script
+├── portable-setup.bat          # Installation
+├── user-config.json            # User settings (auto-created)
+├── device-profile.json         # Device info (auto-created)
+├── .venv/                      # Python environment
+└── README.md                   # This file
+```
+
+## 🔒 Privacy & Security
 
 ✅ **100% Offline**
+- No cloud processing
 - No telemetry
 - No API calls
-- No cloud processing
-- Works without internet (after model download)
+- Models downloaded once, cached locally
+
+✅ **Portable**
+- No system installation
+- No registry changes
+- No admin rights needed
+- Easy complete removal
+
+## 🆘 Getting Help
+
+1. Check the troubleshooting section above
+2. Review the configuration options
+3. Try resetting config (delete user-config.json)
+4. Re-run portable-setup.bat
+
+## 📝 Version History
+
+### v2.0 - Universal Edition
+- Added English formatting support
+- Portable configuration system
+- Device auto-detection
+- Setup wizard for non-technical users
+- Mixed-language optimization
+- Smart layout formatting
+
+### v1.0 - Original
+- Basic Chinese dictation
+- GPU acceleration
+- Configurable hotkeys
+
+## 📄 License
+
+This project uses:
+- [OpenAI Whisper](https://github.com/openai/whisper) - MIT License
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper) - MIT License
 
 ---
 
-## Performance Tips
-
-### For RTX 4070 Ti Super:
-- Use `float16` compute_type (best balance of speed/accuracy)
-- Keep model as `large-v3`
-- Close other GPU-intensive apps
-
-### For Lower VRAM (if needed):
-```json
-{
-  "model": "large-v3",
-  "compute_type": "int8"
-}
-```
-Saves ~40% VRAM with minimal accuracy loss.
-
----
-
-## Daily Workflow
-
-1. **Start dictation:** Double-click `start-dictation.bat`
-2. **Dictate:** Hold your X-Mouse configured button, speak, release
-3. **Text appears** in your active window instantly
-4. **Exit:** Press ESC or close the window
-
----
-
-## System Requirements
-
-- Windows 10/11
-- NVIDIA GPU (RTX 4070 Ti Super recommended)
-- CUDA 12.1+ support
-- 12GB+ VRAM for large-v3
-- Microphone
-- X-Mouse Button Control (optional, for mouse integration)
-
----
-
-## Updates
-
-To update packages:
-```batch
-.venv\Scripts\activate.bat
-pip install --upgrade faster-whisper torch
-```
-
----
-
-**Status:** Production-ready, portable dictation system
+**Made with ❤️ for effortless voice typing**

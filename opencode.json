@@ -1,35 +1,27 @@
 {
-  "$schema": "https://opencode.ai/config.json",
-  "provider": {
-    "alibaba-bailian": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Alibaba Bailian",
-      "options": {
-        "baseURL": "https://dashscope.aliyuncs.com/compatible-mode/v1"
-      },
-      "models": {
-        "qwen-coder-plus-latest": {
-          "name": "Qwen Coder Plus (Latest)",
-          "limit": {
-            "context": 128000,
-            "output": 8192
-          }
-        },
-        "qwen-max-latest": {
-          "name": "Qwen Max (Latest)",
-          "limit": {
-            "context": 128000,
-            "output": 8192
-          }
-        },
-        "qwen-plus-latest": {
-          "name": "Qwen Plus (Latest)",
-          "limit": {
-            "context": 128000,
-            "output": 8192
-          }
-        }
-      }
-    }
+  "project_name": "Whisper Dictation Universal",
+  "description": "Universal voice dictation tool for Windows using OpenAI Whisper. Designed for maximum compatibility with games and elevated applications.",
+  "version": "2.0.0",
+  "key_features": [
+    "Type Anywhere (SendInput API)",
+    "Game Mode (WASAPI Shared Mode + Smart Latch)",
+    "Auto-Elevation (UAC Bypass)",
+    "Local Inference (Faster-Whisper)"
+  ],
+  "architecture": {
+    "language": "Python 3.10+",
+    "audio": "sounddevice (PortAudio)",
+    "input": "ctypes.windll.user32.SendInput",
+    "hotkey": "keyboard (Global Hooks)"
+  },
+  "documentation": {
+    "guide": "AGENT_GUIDE.md",
+    "cleanup_plan": "brain/cleanup_plan.md"
+  },
+  "preferences": {
+    "framework": "tkinter",
+    "style": "pep8",
+    "logging": "console",
+    "deployment": "portable"
   }
 }
