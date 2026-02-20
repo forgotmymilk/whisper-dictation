@@ -6,7 +6,8 @@
     "Type Anywhere (SendInput API)",
     "Game Mode (WASAPI Shared Mode + Smart Latch)",
     "Auto-Elevation (UAC Bypass)",
-    "Local Inference (Faster-Whisper)"
+    "Local Inference (Faster-Whisper)",
+    "AI Polish Functionality (LLM Post-Processing)"
   ],
   "architecture": {
     "language": "Python 3.10+",

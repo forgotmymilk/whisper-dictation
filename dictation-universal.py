@@ -40,6 +40,9 @@ try:
 except ImportError:
     HAS_WINSOUND = False
 
+# Local modules
+from ai_helper import AIPolish
+
 # ============ CONFIGURATION ============
 DEFAULT_CONFIG = {
     "hotkey": "f15",
@@ -668,6 +671,7 @@ class WhisperDictation:
         self.audio_buffer = []
         self.stream = None
         self.formatter = SmartFormatter()
+        self.ai_polish = AIPolish(config)
         self.model = None
         self.tray = None
         self._stop_event = threading.Event()
@@ -1009,6 +1013,7 @@ class WhisperDictation:
             text = " ".join([segment.text.strip() for segment in segments])
 
             if text:
+                # 1. Basic formatting (punctuation, capitalization)
                 lang = self.formatter.detect_language(text)
                 formatted = self.formatter.format_text(
                     text,
@@ -1017,13 +1022,18 @@ class WhisperDictation:
                     enable_format=self.enable_format,
                     enable_cap=self.enable_cap
                 )
-
+                
                 print(f"✓ Done")
-                print(f"   Original: {text[:60]}{'...' if len(text) > 60 else ''}")
-                if formatted != text:
+                print(f"   Original:  {text[:60]}{'...' if len(text) > 60 else ''}")
+
+                # 2. AI Polish (New Step)
+                final_output = self.ai_polish.polish_text(formatted)
+                if final_output != formatted:
+                    print(f"   ✨ Polished: {final_output[:60]}{'...' if len(final_output) > 60 else ''}")
+                elif formatted != text:
                     print(f"   Formatted: {formatted[:60]}{'...' if len(formatted) > 60 else ''}")
 
-                self._output_text(formatted)
+                self._output_text(final_output)
                 print()
             else:
                 print("⚠️  No speech detected\n")

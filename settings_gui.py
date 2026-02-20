@@ -31,6 +31,15 @@ FORMALITY_LEVELS = ["casual", "formal", "business"]
 PRIMARY_LANGS = [("Auto", "auto"), ("Chinese", "zh"), ("English", "en"), ("Mixed", "mixed")]
 INPUT_METHODS = ["unicode", "keyboard", "clipboard"]
 
+AI_PROMPTS = {
+    "Grammar Fix": "Correct the grammar and spelling. Output only the corrected text.",
+    "Professional": "Rewrite to sound professional and polite. Output only the rewritten text.",
+    "Native Speaker": "Rephrase to sound like a native speaker. Output only the refined text.",
+    "Concise": "Rewrite to be concise and clear. Remove fluff. Output only the result.",
+    "Bullet Points": "Summarize into a bulleted list.",
+    "Translator (CN->EN)": "Translate the following Chinese text into natural English."
+}
+
 # ============ TOOLTIPS ============
 
 TIPS = {
@@ -182,6 +191,7 @@ class SettingsApp(ctk.CTk):
         self._build_quality()
         self._build_vad()
         self._build_profile()
+        self._build_ai_polish()
 
         # ---- Footer ----
         footer = ctk.CTkFrame(self, fg_color="transparent", height=56)
@@ -444,6 +454,53 @@ class SettingsApp(ctk.CTk):
                        default=profile.get("formality", "casual"))
         ctk.CTkFrame(c, fg_color="transparent", height=8).pack()
 
+    def _build_ai_polish(self):
+        c = self._card("✨ AI POST-PROCESSING (Polish / Refine)")
+        
+        # Checkbox
+        var = ctk.BooleanVar(value=self.config.get("ai_polish_enabled", False))
+        self.vars["ai_polish_enabled"] = var
+        cb = ctk.CTkCheckBox(c, text="Enable AI Polish", variable=var)
+        cb.pack(pady=5, anchor="w")
+
+        self.vars["ai_api_key"] = ctk.StringVar(value=self.config.get("ai_api_key", ""))
+        self._entry(c, "API Key (OpenAI / DeepSeek / etc)", "ai_api_key", show="*")
+
+        self.vars["ai_base_url"] = ctk.StringVar(value=self.config.get("ai_base_url", "https://api.openai.com/v1"))
+        self._entry(c, "Base URL", "ai_base_url")
+
+        self.vars["ai_model"] = ctk.StringVar(value=self.config.get("ai_model", "gpt-4o-mini"))
+        self._entry(c, "Model Name", "ai_model")
+
+        # Preset Prompts Dropdown
+        self._label(c, "Prompt Template:")
+        
+        prompt_var = ctk.StringVar(value=self.config.get("ai_prompt_template", AI_PROMPTS["Grammar Fix"]))
+        self.vars["ai_prompt_template"] = prompt_var
+
+        def on_preset_change(choice):
+            prompt_var.set(AI_PROMPTS[choice])
+
+        preset_menu = ctk.CTkOptionMenu(c, values=list(AI_PROMPTS.keys()), command=on_preset_change)
+        preset_menu.pack(pady=5, fill="x")
+        preset_menu.set("Select a preset...")
+
+        # Text Area for Prompt
+        txt = ctk.CTkTextbox(c, height=100)
+        txt.pack(pady=5, fill="x")
+        txt.insert("1.0", prompt_var.get())
+        
+        # Bind textbox changes to variable? No easy way in ctk. 
+        # We will read from textbox on save.
+        self.vars["ai_prompt_textbox"] = txt 
+        
+        # Update textbox when variable changes (from dropdown)
+        def update_textbox(*args):
+            txt.delete("1.0", "end")
+            txt.insert("1.0", prompt_var.get())
+        
+        prompt_var.trace_add("write", update_textbox)
+
     # ============ ACTIONS ============
 
     def _on_reset(self):
@@ -531,6 +588,14 @@ class SettingsApp(ctk.CTk):
                 "formality": self.vars["profile_formality"].get(),
                 "common_phrases": self.cfg.get("user_profile", {}).get("common_phrases", []),
             }
+
+            # AI Polish
+            c["ai_polish_enabled"] = self.vars["ai_polish_enabled"].get()
+            c["ai_api_key"] = self.vars["ai_api_key"].get()
+            c["ai_base_url"] = self.vars["ai_base_url"].get()
+            c["ai_model"] = self.vars["ai_model"].get()
+            # Read from textbox directly
+            c["ai_prompt_template"] = self.vars["ai_prompt_textbox"].get("1.0", "end-1c")
 
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(c, f, indent=2, ensure_ascii=False)

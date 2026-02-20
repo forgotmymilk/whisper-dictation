@@ -27,8 +27,19 @@ A universal, highly compatible voice dictation tool for Windows that works in **
     - **hold (> 0.3s)**: Works as Push-to-Talk.
 - **Files**: Logic sits in `dictation-universal.py` -> `stop_recording`.
 
+### 4. AI Polish (Post-Processing)
+- **Goal**: Refine raw speech text (grammar, tone, translation) using LLMs.
+- **Implementation**:
+    - `ai_helper.py`: Handles HTTP requests to OpenAI-compatible APIs (using `requests`).
+    - `input`: Raw text from Whisper.
+    - `processing`: Sends text + System Prompt to LLM.
+    - `output`: Refined text replaces original text in `_output_text`.
+- **Configuration**: Managed in `settings_gui.py` -> "AI Polish" tab.
+- **Dependencies**: Requires `requests` library.
+
 ## 📁 File Structure
 - `dictation-universal.py`: **Main Application**.
+- `ai_helper.py`: **AI Client Module**.
 - `start-universal.bat`: **Launcher** (use this).
 - `settings_gui.py`: Configuration UI.
 - `legacy/`: Archive of old/superseded scripts.
