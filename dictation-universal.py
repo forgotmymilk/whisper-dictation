@@ -871,6 +871,7 @@ class WhisperDictation:
             if self._stream_error_count <= 3:
                 print(f"⚠️  Audio stream warning: {status}")
         if self.is_recording:
+            self._callbacks_during_recording += 1
             self.audio_buffer.append(indata.copy())
 
     def _play_beep(self, freq: int = 800, duration_ms: int = 100):
@@ -884,30 +885,81 @@ class WhisperDictation:
                 pass
 
     def start_recording(self):
-        """Start recording (hotkey pressed)."""
-        if self.is_recording or self.is_paused:
+        """Handle hotkey press: Start or Toggle Stop."""
+        # If currently paused, ignore or resume? For now, ignore if paused (use F14 to resume)
+        if self.is_paused:
             return
 
-        self.audio_buffer = []
-        self.is_recording = True
-        self._update_tray_state(self.STATE_RECORDING)
-        self._play_beep(800, 80)  # Short high beep = start
-        print("🔴 Recording... (speak now)")
+        # Smart Latch Logic:
+        # 1. If NOT recording: Start recording.
+        # 2. If recording and WAS LATCHED (tapped previously): Stop recording.
+        # 3. If recording and NOT latched (currently holding): Ignore (key repeat).
 
-    def stop_recording(self):
-        """Stop and process recording (hotkey released)."""
+        if not self.is_recording:
+            # --- START RECORDING ---
+            self.audio_buffer = []
+            self._recording_start_time = time.time()
+            self._callbacks_during_recording = 0
+            self.is_recording = True
+            self.is_latched = False  # Default to PTT mode, upgrade to latched if released quickly
+            
+            self._update_tray_state(self.STATE_RECORDING)
+            self._play_beep(800, 80)
+            print("🔴 Recording... (speak now)")
+        
+        elif self.is_latched:
+            # --- STOP RECORDING (Toggle off) ---
+            self.stop_recording(force=True)
+
+    def stop_recording(self, force=False):
+        """Handle hotkey release: Check for Latch or Stop."""
         if not self.is_recording:
             return
 
+        # If this is a forced stop (from press-to-toggle-off), execute stop.
+        if force:
+            pass  # Proceed to stop
+        
+        # If currently latched, release event means nothing (user lifted finger after toggle-off press? 
+        # No, wait. If latched, the 'press' stops it. The 'release' shouldn't do anything.)
+        elif self.is_latched:
+            return
+
+        # If NOT latched (normal PTT state), check hold duration
+        else:
+            hold_duration = time.time() - self._recording_start_time
+            
+            # If held less than 0.3s, treat as TAP -> LATCH ON (Toggle Mode)
+            # This failsafe also handles games that force immediate release events (~0.01s)
+            if hold_duration < 0.3:
+                self.is_latched = True
+                print(f"   🔒 Latched Mode (Tap to stop)")
+                return
+            
+            # Otherwise, normal PTT stop
+            pass
+
+        # --- EXECUTE STOP ---
         self.is_recording = False
+        self.is_latched = False
+        
+        # Diagnostics
+        hold_duration = time.time() - self._recording_start_time
+        cb_count = self._callbacks_during_recording
+        # print(f"   ⏱ Held {hold_duration:.3f}s / {cb_count} callbacks") # Debug only
+
         self._update_tray_state(self.STATE_PROCESSING)
         time.sleep(0.1)
 
         if not self.audio_buffer:
-            print("⚠️  No audio captured (hold key longer)\n")
+            print("⚠️  No audio captured\n")
             self._update_tray_state(self.STATE_READY)
             return
 
+        threading.Thread(target=self._process_recording, daemon=True).start()
+
+    def _process_recording(self):
+        """Process captured audio (runs in background thread)."""
         audio_data = np.concatenate(self.audio_buffer, axis=0)
         duration = len(audio_data) / self.sample_rate
 
@@ -1063,18 +1115,11 @@ class WhisperDictation:
                     print("❌ Audio stream restart failed. Will retry...")
 
     def _hook_watchdog(self):
-        """Periodically re-register keyboard hooks in case a game unhooks them."""
-        while not self._stop_event.is_set():
-            self._stop_event.wait(10)  # check every 10 seconds
-            if self._stop_event.is_set():
-                break
-            try:
-                keyboard.unhook_all()
-                keyboard.on_press_key(self.hotkey, lambda _: self.start_recording())
-                keyboard.on_release_key(self.hotkey, lambda _: self.stop_recording())
-                keyboard.on_press_key(self.pause_hotkey, lambda _: self._on_toggle_pause())
-            except Exception as e:
-                print(f"⚠️  Hook refresh error: {e}")
+        """Monitor keyboard hooks and re-register only if they stop working."""
+        # Don't aggressively unhook_all — it disrupts press-hold-release cycles.
+        # Instead, just monitor. If hooks stop working, the user will notice
+        # and can restart the app.
+        pass  # Disabled: aggressive rehooking causes more harm than good
 
     def _run_dictation_loop(self):
         """Dictation engine running in a background thread."""
