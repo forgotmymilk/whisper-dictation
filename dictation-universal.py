@@ -1009,38 +1009,43 @@ class WhisperDictation:
 
     def _open_audio_stream(self):
         """Open (or reopen) the audio input stream in shared mode."""
-        try:
-            if self.stream is not None:
-                try:
-                    self.stream.stop()
-                    self.stream.close()
-                except Exception:
-                    pass
-
-            extra_settings = None
+        if self.stream is not None:
             try:
-                # Force WASAPI shared mode so games can't steal exclusive access
-                extra_settings = sd.WasapiSettings(exclusive=False)
+                self.stream.stop()
+                self.stream.close()
             except Exception:
-                pass  # Not on Windows or sounddevice too old
+                pass
 
-            kwargs = {
-                "samplerate": self.sample_rate,
-                "channels": 1,
-                "callback": self.audio_callback,
-                "blocksize": 1024,
-            }
-            if extra_settings:
-                kwargs["extra_settings"] = extra_settings
+        base_kwargs = {
+            "samplerate": self.sample_rate,
+            "channels": 1,
+            "callback": self.audio_callback,
+            "blocksize": 1024,
+        }
 
-            self.stream = sd.InputStream(**kwargs)
-            self.stream.start()
-            self._last_audio_callback_time = time.time()
-            self._stream_error_count = 0
-            return True
-        except Exception as e:
-            print(f"❌ Failed to open audio stream: {e}")
-            return False
+        # Strategy: try WASAPI shared mode first (best for games),
+        # fall back to default if device doesn't support WASAPI.
+        attempts = []
+        try:
+            wasapi = sd.WasapiSettings(exclusive=False)
+            attempts.append(("WASAPI shared mode", {**base_kwargs, "extra_settings": wasapi}))
+        except Exception:
+            pass  # WasapiSettings not available
+        attempts.append(("default mode", base_kwargs))
+
+        for label, kwargs in attempts:
+            try:
+                self.stream = sd.InputStream(**kwargs)
+                self.stream.start()
+                self._last_audio_callback_time = time.time()
+                self._stream_error_count = 0
+                print(f"   🎤 Audio stream opened ({label})")
+                return True
+            except Exception as e:
+                print(f"   ⚠️  {label} failed: {e}")
+
+        print("❌ All audio stream modes failed.")
+        return False
 
     def _stream_watchdog(self):
         """Monitor audio stream health; restart if it dies."""
