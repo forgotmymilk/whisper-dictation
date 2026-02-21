@@ -40,6 +40,31 @@ AI_PROMPTS = {
     "Translator (CN->EN)": "Translate the following Chinese text into natural English."
 }
 
+AI_PROVIDERS = {
+    "--- International ---": {"url": "", "model": ""},
+    "DeepSeek (Global)": {"url": "https://api.deepseek.com/v1", "model": "deepseek-chat"},
+    "Groq": {"url": "https://api.groq.com/openai/v1", "model": "llama-3.3-70b-versatile"},
+    "Together AI": {"url": "https://api.together.xyz/v1", "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo"},
+    "OpenRouter": {"url": "https://openrouter.ai/api/v1", "model": "meta-llama/llama-3.3-70b-instruct:free"},
+    "Google AI Studio": {"url": "https://generativelanguage.googleapis.com/v1beta/openai", "model": "gemini-2.5-flash"},
+    "Fireworks AI": {"url": "https://api.fireworks.ai/inference/v1", "model": "accounts/fireworks/models/llama-v3p3-70b-instruct"},
+    "Anthropic": {"url": "https://api.anthropic.com/v1", "model": "claude-3-5-haiku-20241022"},
+    "OpenAI": {"url": "https://api.openai.com/v1", "model": "gpt-4o-mini"},
+    "Mistral": {"url": "https://api.mistral.ai/v1", "model": "open-mistral-nemo"},
+    "SiliconFlow (Global)": {"url": "https://api.siliconflow.cn/v1", "model": "deepseek-ai/DeepSeek-V3"},
+    "--- Mainland China ---": {"url": "", "model": ""},
+    "ByteDance / Doubao": {"url": "https://ark.cn-beijing.volces.com/api/v3", "model": "doubao-lite-32k"},
+    "Alibaba / Qwen": {"url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "model": "qwen-plus"},
+    "Zhipu AI / GLM": {"url": "https://open.bigmodel.cn/api/paas/v4", "model": "glm-4-flash"},
+    "Baidu / ERNIE": {"url": "https://qianfan.baidubce.com/v2", "model": "ernie-speed-128k"},
+    "DeepSeek (Mainland)": {"url": "https://api.deepseek.com/v1", "model": "deepseek-chat"},
+    "Tencent / Hunyuan": {"url": "https://api.hunyuan.cloud.tencent.com/v1", "model": "hunyuan-lite"},
+    "Moonshot / Kimi": {"url": "https://api.moonshot.cn/v1", "model": "moonshot-v1-8k"},
+    "MiniMax": {"url": "https://api.minimax.chat/v1", "model": "abab6.5s-chat"},
+    "SenseTime / SenseNova": {"url": "https://api.sensenova.cn/compatible-mode/v1", "model": "SenseChat-5"},
+    "01.AI / Yi": {"url": "https://api.lingyiwanwu.com/v1", "model": "yi-spark"}
+}
+
 # ============ TOOLTIPS ============
 
 TIPS = {
@@ -218,9 +243,11 @@ class SettingsApp(ctk.CTk):
 
         # Center on screen
         self.update_idletasks()
-        x = (self.winfo_screenwidth() // 2) - (self.winfo_width() // 2)
-        y = (self.winfo_screenheight() // 2) - (self.winfo_height() // 2)
-        self.geometry(f"+{x}+{y}")
+        win_w = 640
+        win_h = 800
+        x = (self.winfo_screenwidth() // 2) - (win_w // 2)
+        y = (self.winfo_screenheight() // 2) - (win_h // 2)
+        self.geometry(f"{win_w}x{win_h}+{x}+{y}")
 
     # ============ SECTION BUILDERS ============
 
@@ -255,14 +282,20 @@ class SettingsApp(ctk.CTk):
 
         return row
 
-    def _entry(self, parent, label, key, width=140, default=None):
+    def _label(self, parent, text):
+        lbl = ctk.CTkLabel(parent, text=text, font=ctk.CTkFont(size=12, weight="bold"),
+                           text_color=COLORS["text"], anchor="w")
+        lbl.pack(fill="x", padx=16, pady=(8, 2))
+        return lbl
+
+    def _entry(self, parent, label, key, width=140, default=None, **kwargs):
         row = self._row(parent, label, key)
         val = default if default is not None else self.cfg.get(key, "")
         self.vars[key] = ctk.StringVar(value=str(val))
         ctk.CTkEntry(row, textvariable=self.vars[key], width=width,
                      fg_color=COLORS["bg_input"], border_color=COLORS["border"],
                      text_color=COLORS["text"],
-                     font=ctk.CTkFont(size=12)).pack(side="right")
+                     font=ctk.CTkFont(size=12), **kwargs).pack(side="right")
 
     def _dropdown(self, parent, label, key, values, width=160, default=None):
         row = self._row(parent, label, key)
@@ -315,7 +348,7 @@ class SettingsApp(ctk.CTk):
         slider.pack(side="right", padx=(0, 8))
         _update(val)
 
-    def _spinbox(self, parent, label, key, from_, to, step=1, default=None, width=100):
+    def _spinbox(self, parent, label, key, from_, to, step=1, default=None, width=100, **kwargs):
         """Numeric entry with arrows for fine-grained control."""
         row = self._row(parent, label, key)
         val = default if default is not None else self.cfg.get(key, from_)
@@ -327,7 +360,7 @@ class SettingsApp(ctk.CTk):
         entry = ctk.CTkEntry(frame, textvariable=self.vars[key], width=width,
                              fg_color=COLORS["bg_input"], border_color=COLORS["border"],
                              text_color=COLORS["text"], justify="center",
-                             font=ctk.CTkFont(size=12))
+                             font=ctk.CTkFont(size=12), **kwargs)
         entry.pack(side="left")
 
     # ============ SECTIONS ============
@@ -367,6 +400,7 @@ class SettingsApp(ctk.CTk):
         self._switch(c, "Auto-punctuation", "enable_punctuation")
         self._switch(c, "Smart formatting", "enable_formatting")
         self._switch(c, "Auto-capitalization", "enable_capitalization")
+        self._switch(c, "Enable local history logging", "enable_history_logging")
         self._slider(c, "Max line length", "max_line_length", 40, 200, step=10)
         ctk.CTkFrame(c, fg_color="transparent", height=8).pack()
 
@@ -458,32 +492,81 @@ class SettingsApp(ctk.CTk):
         c = self._card("✨ AI POST-PROCESSING (Polish / Refine)")
         
         # Checkbox
-        var = ctk.BooleanVar(value=self.config.get("ai_polish_enabled", False))
+        var = ctk.BooleanVar(value=self.cfg.get("ai_polish_enabled", False))
         self.vars["ai_polish_enabled"] = var
         cb = ctk.CTkCheckBox(c, text="Enable AI Polish", variable=var)
-        cb.pack(pady=5, anchor="w")
+        cb.pack(pady=5, anchor="w", padx=16)
 
-        self.vars["ai_api_key"] = ctk.StringVar(value=self.config.get("ai_api_key", ""))
+        # Provider Selector
+        self.vars["ai_provider"] = ctk.StringVar(value=self.cfg.get("ai_provider", "OpenAI"))
+        provider_menu = ctk.CTkOptionMenu(
+            c, 
+            variable=self.vars["ai_provider"], 
+            values=list(AI_PROVIDERS.keys()),
+            width=200,
+            fg_color=COLORS["bg_input"],
+            button_color=COLORS["accent"],
+            button_hover_color=COLORS["accent_hover"],
+            dropdown_fg_color=COLORS["bg_card"],
+            dropdown_hover_color=COLORS["accent"],
+            text_color=COLORS["text"],
+            command=self._on_ai_provider_change
+        )
+        provider_menu.pack(pady=10, anchor="w", padx=16)
+
+        self.vars["ai_api_key"] = ctk.StringVar(value=self.cfg.get("ai_api_key", ""))
         self._entry(c, "API Key (OpenAI / DeepSeek / etc)", "ai_api_key", show="*")
 
-        self.vars["ai_base_url"] = ctk.StringVar(value=self.config.get("ai_base_url", "https://api.openai.com/v1"))
+        self.vars["ai_base_url"] = ctk.StringVar(value=self.cfg.get("ai_base_url", "https://api.openai.com/v1"))
         self._entry(c, "Base URL", "ai_base_url")
 
-        self.vars["ai_model"] = ctk.StringVar(value=self.config.get("ai_model", "gpt-4o-mini"))
+        self.vars["ai_model"] = ctk.StringVar(value=self.cfg.get("ai_model", "gpt-4o-mini"))
         self._entry(c, "Model Name", "ai_model")
 
         # Preset Prompts Dropdown
         self._label(c, "Prompt Template:")
         
-        prompt_var = ctk.StringVar(value=self.config.get("ai_prompt_template", AI_PROMPTS["Grammar Fix"]))
+        prompt_var = ctk.StringVar(value=self.cfg.get("ai_prompt_template", AI_PROMPTS.get("Grammar Fix", "")))
         self.vars["ai_prompt_template"] = prompt_var
 
-        def on_preset_change(choice):
-            prompt_var.set(AI_PROMPTS[choice])
+        custom_prompts = self.cfg.get("ai_custom_prompts", {})
+        all_prompts = {**AI_PROMPTS, **custom_prompts}
 
-        preset_menu = ctk.CTkOptionMenu(c, values=list(AI_PROMPTS.keys()), command=on_preset_change)
-        preset_menu.pack(pady=5, fill="x")
-        preset_menu.set("Select a preset...")
+        def on_preset_change(choice):
+            prompt_var.set(all_prompts.get(choice, ""))
+
+        prompt_frame = ctk.CTkFrame(c, fg_color="transparent")
+        prompt_frame.pack(pady=5, fill="x", padx=16)
+
+        preset_menu = ctk.CTkOptionMenu(prompt_frame, values=list(all_prompts.keys()), command=on_preset_change)
+        preset_menu.pack(side="left", fill="x", expand=True)
+
+        found_key = next((k for k, v in all_prompts.items() if v == prompt_var.get()), "Select a preset...")
+        preset_menu.set(found_key)
+        
+        def save_new_prompt():
+            dialog = ctk.CTkInputDialog(text="Enter name for new prompt preset:", title="Save Preset")
+            name = dialog.get_input()
+            if name and name.strip():
+                name = name.strip()
+                custom_prompts[name] = prompt_var.get()
+                self.cfg["ai_custom_prompts"] = custom_prompts
+                all_prompts.update({name: prompt_var.get()})
+                preset_menu.configure(values=list(all_prompts.keys()))
+                preset_menu.set(name)
+                
+        def delete_prompt():
+            current_name = preset_menu.get()
+            if current_name in custom_prompts:
+                del custom_prompts[current_name]
+                self.cfg["ai_custom_prompts"] = custom_prompts
+                if current_name in all_prompts:
+                    del all_prompts[current_name]
+                preset_menu.configure(values=list(all_prompts.keys()))
+                preset_menu.set("Select a preset...")
+
+        ctk.CTkButton(prompt_frame, text="Save As", width=60, fg_color=COLORS["success"], hover_color="#00b88c", command=save_new_prompt).pack(side="left", padx=(8, 0))
+        ctk.CTkButton(prompt_frame, text="Delete", width=60, fg_color=COLORS["danger"], hover_color="#e65c5c", command=delete_prompt).pack(side="left", padx=(8, 0))
 
         # Text Area for Prompt
         txt = ctk.CTkTextbox(c, height=100)
@@ -500,6 +583,16 @@ class SettingsApp(ctk.CTk):
             txt.insert("1.0", prompt_var.get())
         
         prompt_var.trace_add("write", update_textbox)
+
+    def _on_ai_provider_change(self, choice):
+        if choice.startswith("---"):
+            return
+        url = AI_PROVIDERS[choice]["url"]
+        model = AI_PROVIDERS[choice]["model"]
+        if url:
+            self.vars["ai_base_url"].set(url)
+        if model:
+            self.vars["ai_model"].set(model)
 
     # ============ ACTIONS ============
 
@@ -537,6 +630,7 @@ class SettingsApp(ctk.CTk):
             c["enable_punctuation"] = self.vars["enable_punctuation"].get()
             c["enable_formatting"] = self.vars["enable_formatting"].get()
             c["enable_capitalization"] = self.vars["enable_capitalization"].get()
+            c["enable_history_logging"] = self.vars["enable_history_logging"].get()
             c["max_line_length"] = int(round(self.vars["max_line_length"].get()))
 
             # Output
@@ -591,9 +685,11 @@ class SettingsApp(ctk.CTk):
 
             # AI Polish
             c["ai_polish_enabled"] = self.vars["ai_polish_enabled"].get()
+            c["ai_provider"] = self.vars["ai_provider"].get()
             c["ai_api_key"] = self.vars["ai_api_key"].get()
             c["ai_base_url"] = self.vars["ai_base_url"].get()
             c["ai_model"] = self.vars["ai_model"].get()
+            c["ai_custom_prompts"] = self.cfg.get("ai_custom_prompts", {})
             # Read from textbox directly
             c["ai_prompt_template"] = self.vars["ai_prompt_textbox"].get("1.0", "end-1c")
 

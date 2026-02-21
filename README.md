@@ -11,12 +11,16 @@
 - **英文 (English)**: 自动标点、句首大写、智能分句。
 - **混合 (Mixed)**: 自动优化中英文之间的空格 (Auto-spacing between Chinese & English)。
 
-### ✨ AI 润色 (AI Polish) - **NEW!**
+### ✨ AI 润色 (AI Polish)
 - **语法修正 (Grammar Fix)**: 瞬间修复口语中的语法错误。
-- **语气调整 (Tone Adjustment)**: 将原本的话改为“商务风”、“地道口语”或“简洁模式”。
-- **翻译 (Translation)**:哪怕你说的是中文，也能直接输出英文。
+- **自定义语境 (Custom Scenarios)**: 在设置中自定义和保存属于你的专属 AI Prompt。
+- **混合语言保护 (Language Preservation)**: 严格保留原句的真实语种，拒绝 AI 自作聪明的强制翻译，完美支持中英夹杂 (Code-switching)。
+- **翻译 (Translation)**: 仅在显式选择翻译模板时，执行指定翻译。
 - **兼容性 (BYO Key)**: 支持 OpenAI, DeepSeek, Google Gemini 等所有兼容 API。
-- *English:* Integrate LLM support to refine grammar, tone, or translate text instantly.
+
+### 💾 状态备份与本地归档 (Stateful Backup & Archiving)
+- **无损剪贴板 (Safe Clipboard Input)**: 专为 Fluent Search 等 UWP 现代应用开发的剪贴板注入模式。毫秒级备份并还原你的物理剪贴板，无论怎么语音输入，都不会覆盖你原本复制的数据。
+- **本地历史记录 (Local History Logging)**: 像写日记一样自动保存每一次语音输入的原始推测（Raw）与 AI 润色结果（Polished）。按月归档为本地 Markdown 文件，方便复盘与知识沉淀。
 
 ### 🎮 游戏兼容模式 / Game Compatibility
 - **Smart Latch**: **轻按 (Tap)** 快捷键切换录音开关（解决游戏屏蔽长按的问题）；**长按 (Hold)** 保持对讲机模式。

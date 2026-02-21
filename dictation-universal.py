@@ -54,6 +54,7 @@ DEFAULT_CONFIG = {
     "enable_punctuation": True,
     "enable_formatting": True,
     "enable_capitalization": True,
+    "enable_history_logging": True,
     "max_line_length": 80,
     "output_mode": "type",
     "sample_rate": 16000,
@@ -101,6 +102,7 @@ if platform.system() == "Windows":
     from ctypes import wintypes
 
     user32 = ctypes.WinDLL('user32', use_last_error=True)
+    kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
 
     INPUT_KEYBOARD = 1
     KEYEVENTF_UNICODE = 0x0004
@@ -682,6 +684,14 @@ class WhisperDictation:
         # Load all settings from config
         self._load_config(config)
 
+        # Setup history directory
+        self.history_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "history")
+        if self.enable_history_logging and not os.path.exists(self.history_dir):
+            try:
+                os.makedirs(self.history_dir, exist_ok=True)
+            except Exception as e:
+                print(f"⚠️ Could not create history directory: {e}")
+
         self._print_banner()
         self._load_model()
 
@@ -701,6 +711,7 @@ class WhisperDictation:
         self.enable_punct = config.get("enable_punctuation", True)
         self.enable_format = config.get("enable_formatting", True)
         self.enable_cap = config.get("enable_capitalization", True)
+        self.enable_history_logging = config.get("enable_history_logging", True)
         self.max_line_length = config.get("max_line_length", 80)
 
         # Output & audio
@@ -1034,6 +1045,13 @@ class WhisperDictation:
                     print(f"   Formatted: {formatted[:60]}{'...' if len(formatted) > 60 else ''}")
 
                 self._output_text(final_output)
+
+                # 3. Log to History
+                if self.enable_history_logging:
+                    # If AI Polish didn't change it, no point showing Polished version in logs
+                    polished_for_log = final_output if final_output != text else None
+                    self._log_history(text, polished_for_log)
+
                 print()
             else:
                 print("⚠️  No speech detected\n")
@@ -1046,9 +1064,33 @@ class WhisperDictation:
                 os.remove(temp_path)
             self._update_tray_state(self.STATE_READY)
 
+    def _log_history(self, raw_text: str, polished_text: str = None):
+        """Append the dictation entry to a local markdown file organized by month."""
+        try:
+            current_time = time.localtime()
+            month_str = time.strftime("%Y-%m", current_time)
+            timestamp_str = time.strftime("%Y-%m-%d %H:%M:%S", current_time)
+            
+            history_file = os.path.join(self.history_dir, f"dictation_{month_str}.md")
+            
+            # Create file header if it's the first time
+            if not os.path.exists(history_file):
+                with open(history_file, 'w', encoding='utf-8') as f:
+                    f.write(f"# Dictation History - {time.strftime('%B %Y', current_time)}\n\n")
+
+            with open(history_file, 'a', encoding='utf-8') as f:
+                f.write(f"### [{timestamp_str}]\n")
+                f.write(f"- **Raw**: {raw_text}\n")
+                if polished_text and polished_text != raw_text:
+                    f.write(f"- **Polished**: {polished_text}\n")
+                f.write("\n")
+                
+        except Exception as e:
+            print(f"⚠️ Failed to write to history log: {e}")
+
     def _output_text(self, text):
         """Output text according to mode."""
-        if self.output_mode in ["clipboard", "both"]:
+        if self.output_mode in ["clipboard", "both"] and self.input_method != "clipboard":
             pyperclip.copy(text)
 
         if self.output_mode in ["type", "both"]:
@@ -1060,9 +1102,28 @@ class WhisperDictation:
             if self.input_method == "unicode":
                 send_unicode_input(safe_text)
             elif self.input_method == "clipboard":
-                # Fallback to pasting if the app supports it better
+                # Save previous clipboard safely using pyperclip
+                try:
+                    old_clipboard = pyperclip.paste()
+                except Exception:
+                    old_clipboard = ""
+
+                # Write our dictation text
                 pyperclip.copy(safe_text)
+                
+                # Tiny sleep to ensure OS fully registers clipboard change before ctrl+v
+                time.sleep(0.05)
                 keyboard.press_and_release('ctrl+v')
+
+                # We must sleep slightly longer here before restoring the old text,
+                # otherwise the target app might grab the restored old text instead 
+                # of our dictation when it processes the Ctrl+V event.
+                time.sleep(0.15)
+                
+                # Restore previous transparently
+                if old_clipboard:
+                    pyperclip.copy(old_clipboard)
+
             else:
                 # Default legacy method
                 keyboard.write(safe_text)

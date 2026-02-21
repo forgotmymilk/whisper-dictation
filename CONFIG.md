@@ -27,6 +27,7 @@ All settings are in `config.json`. Every field is optional — defaults are appl
 | `enable_punctuation` | `true` | Auto-add punctuation (。，！？ / . , ! ?) |
 | `enable_formatting` | `true` | Paragraph breaks, CJK-Latin spacing |
 | `enable_capitalization` | `true` | Capitalize English sentences |
+| `enable_history_logging` | `true` | Save audio transcriptions and AI edits to local Markdown logs |
 | `max_line_length` | `80` | Max chars per line when formatting is on |
 
 ## Output & Audio
@@ -34,7 +35,7 @@ All settings are in `config.json`. Every field is optional — defaults are appl
 | Field | Default | Description |
 |-------|---------|-------------|
 | `output_mode` | `"type"` | `type` / `clipboard` / `both` | Output format |
-| `input_method` | `"unicode"` | `unicode` / `keyboard` / `clipboard` | `unicode` is best for games and floating windows |
+| `input_method` | `"unicode"` | `unicode` / `keyboard` / `clipboard` | `unicode` is best for games. Use `clipboard` (Stateful Backup) for UWP Apps like Fluent Search. |
 | `sample_rate` | `16000` | Audio sample rate in Hz (16000 optimal for Whisper) |
 | `audio_threshold` | `0.01` | Min mic level for startup test |
 | `min_duration` | `0.5` | Ignore recordings shorter than this (sec) |
@@ -80,3 +81,15 @@ All settings are in `config.json`. Every field is optional — defaults are appl
 | `user_profile.primary_language` | `"auto"` | `auto` `zh` `en` `mixed` |
 | `user_profile.formality` | `"casual"` | `casual` `formal` `business` |
 | `user_profile.common_phrases` | `[]` | Frequently used terms |
+
+## AI Polish (Post-Processing)
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `ai_polish_enabled` | `false` | Enable/Disable LLM post-processing |
+| `ai_provider` | `"OpenAI"` | The API provider name |
+| `ai_api_key` | `""` | Bearer token/API key |
+| `ai_base_url` | `"https://api.openai.com/v1"` | API Endpoint |
+| `ai_model` | `"gpt-4o-mini"` | Name of the model to query |
+| `ai_prompt_template` | `"Fix grammar..."` | The active system prompt template |
+| `ai_custom_prompts` | `{}` | Key-value mapping of custom prompt scenarios |

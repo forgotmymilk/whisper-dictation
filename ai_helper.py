@@ -25,7 +25,15 @@ class AIPolish:
         model = self.config.get("ai_model", "gpt-4o-mini")
         prompt_template = self.config.get("ai_prompt_template", "Fix grammar and polish user input.")
         
-        system_prompt = f"{prompt_template}\nOutput only the refined text. Do not add intro/outro."
+        language_directive = (
+            "CRITICAL: You MUST preserve the exact language(s) of the original text. "
+            "If it is English, output English. If it is Chinese, output Chinese. "
+            "If it is a mix of both (code-switching, e.g. Chinese with English technical terms), "
+            "you MUST maintain that exact bilingual structure. NEVER automatically translate between languages unless explicitly instructed. "
+            "Only fix grammar, tone, formality, phrasing, and clarity."
+        )
+        
+        system_prompt = f"{prompt_template}\n\n{language_directive}\nOutput only the refined text. Do not add intro/outro."
         
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -46,16 +54,44 @@ class AIPolish:
             print(f"🤖 AI Polishing ({model})...", end=" ")
             start_t = time.time()
             
-            response = requests.post(
-                f"{base_url}/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=10  # 10s timeout
-            )
-            response.raise_for_status()
+            is_anthropic = "api.anthropic.com" in base_url
             
-            result = response.json()
-            polished = result["choices"][0]["message"]["content"].strip()
+            if is_anthropic:
+                anthropic_url = f"{base_url}/messages"
+                anthropic_headers = {
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json"
+                }
+                anthropic_payload = {
+                    "model": model,
+                    "max_tokens": 1024,
+                    "system": system_prompt,
+                    "messages": [
+                        {"role": "user", "content": text}
+                    ],
+                    "temperature": 0.7
+                }
+                response = requests.post(
+                    anthropic_url,
+                    headers=anthropic_headers,
+                    json=anthropic_payload,
+                    timeout=10
+                )
+                response.raise_for_status()
+                result = response.json()
+                polished = result["content"][0]["text"].strip()
+            else:
+                response = requests.post(
+                    f"{base_url}/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=10  # 10s timeout
+                )
+                response.raise_for_status()
+                
+                result = response.json()
+                polished = result["choices"][0]["message"]["content"].strip()
             
             duration = time.time() - start_t
             print(f"✓ Done ({duration:.1f}s)")
