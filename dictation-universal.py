@@ -778,12 +778,53 @@ class WhisperDictation:
     def _build_menu(self) -> pystray.Menu:
         """Build the tray right-click menu."""
         pause_label = "Resume" if self.is_paused else "Pause"
+        
+        # Load active profile info
+        active_prof = self.config.get("ai_active_profile", "")
+        saved_profiles = self.config.get("ai_saved_profiles", {})
+        
+        # Build profile switcher submenu items
+        profile_items = []
+        for name in saved_profiles.keys():
+            # Checkmark the active one
+            label = f"✓ {name}" if name == active_prof else name
+            
+            # Create a lambda that binds the current name
+            # Using default arg var=name to capture it in loop
+            handler = lambda icon, item, n=name: self._on_switch_profile(n)
+            profile_items.append(pystray.MenuItem(label, handler))
+            
+        # Add a "None (Use Defaults)" option
+        none_label = "✓ None (Use Defaults)" if not active_prof else "None (Use Defaults)"
+        profile_items.append(pystray.Menu.SEPARATOR)
+        profile_items.append(pystray.MenuItem(none_label, lambda icon, item: self._on_switch_profile("")))
+
         return pystray.Menu(
             pystray.MenuItem(pause_label, self._on_toggle_pause),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem("AI Quick Profiles", pystray.Menu(*profile_items)),
+            pystray.Menu.SEPARATOR,
             pystray.MenuItem("Settings...", self._on_settings),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Exit", self._on_exit),
         )
+
+    def _on_switch_profile(self, profile_name: str):
+        """Switch the active AI Quick Profile."""
+        self.config["ai_active_profile"] = profile_name
+        
+        # Save to file
+        try:
+            with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+                json.dump(self.config, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"⚠️ Failed to save active profile: {e}")
+            
+        print(f"\n✨ Switched active AI profile to: '{profile_name if profile_name else 'None (Use Defaults)'}'")
+        
+        # Rebuild menu to update checkmarks
+        if self.tray:
+            self.tray.menu = self._build_menu()
 
     def _on_toggle_pause(self, icon=None, item=None):
         """Toggle pause/resume."""
@@ -1291,6 +1332,62 @@ def hide_console_window():
         pass
 
 
+def set_startup_shortcut(enable: bool):
+    """Create or remove a Windows startup shortcut using a temporary VBS script."""
+    if platform.system() != "Windows":
+        return
+
+    startup_folder = os.path.join(os.environ["APPDATA"], r"Microsoft\Windows\Start Menu\Programs\Startup")
+    shortcut_path = os.path.join(startup_folder, "WhisperDictation.lnk")
+    
+    if not enable:
+        if os.path.exists(shortcut_path):
+            try:
+                os.remove(shortcut_path)
+            except Exception as e:
+                print(f"⚠️ Failed to remove startup shortcut: {e}")
+        return
+
+    # If enabling, create the shortcut if it doesn't exist
+    if not os.path.exists(shortcut_path):
+        target = sys.executable
+        # If running from source, arguments are the script name
+        # If running as a frozen pyinstaller exe, args are empty
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        if getattr(sys, 'frozen', False):
+            # Running as compiled executable
+            args = ""
+            work_dir = script_dir
+        else:
+            # Running as python script
+            args = f'"{os.path.abspath(__file__)}"'
+            work_dir = script_dir
+
+        # VBS script to bypass pywin32 dependency for maximum portability
+        vbs_content = f'''
+        Set oWS = WScript.CreateObject("WScript.Shell")
+        sLinkFile = "{shortcut_path}"
+        Set oLink = oWS.CreateShortcut(sLinkFile)
+        oLink.TargetPath = "{target}"
+        oLink.Arguments = "{args}"
+        oLink.WorkingDirectory = "{work_dir}"
+        oLink.Description = "Universal Whisper Dictation"
+        oLink.Save
+        '''
+        
+        vbs_path = os.path.join(tempfile.gettempdir(), "create_shortcut.vbs")
+        try:
+            with open(vbs_path, "w") as f:
+                f.write(vbs_content)
+            subprocess.run(["cscript.exe", "//Nologo", vbs_path], creationflags=subprocess.CREATE_NO_WINDOW)
+        except Exception as e:
+            print(f"⚠️ Failed to create startup shortcut: {e}")
+        finally:
+            if os.path.exists(vbs_path):
+                os.remove(vbs_path)
+
+
 def is_admin():
     try:
         return ctypes.windll.shell32.IsUserAnAdmin()
@@ -1314,6 +1411,10 @@ def main():
             choice = input("   Continue anyway? (y/n) [y]: ").strip().lower()
             if choice == 'n':
                 return
+
+        # Apply startup setting
+        launch_at_startup = config.get("launch_at_startup", False)
+        set_startup_shortcut(launch_at_startup)
 
         app = WhisperDictation(config)
 

@@ -2,6 +2,8 @@ import requests
 import json
 import time
 
+from ai_presets import AI_PERSONAS, AI_STYLES, AI_TRANSLATIONS
+
 class AIPolish:
     def __init__(self, config):
         self.config = config
@@ -20,20 +22,66 @@ class AIPolish:
             print("⚠️  AI Polish enabled but no API Key provided.")
             return text
 
-        # 2. Prepare Request
+        # 2. Get the active prompt builder pieces
         base_url = self.config.get("ai_base_url", "https://api.openai.com/v1").rstrip("/")
         model = self.config.get("ai_model", "gpt-4o-mini")
-        prompt_template = self.config.get("ai_prompt_template", "Fix grammar and polish user input.")
         
-        language_directive = (
-            "CRITICAL: You MUST preserve the exact language(s) of the original text. "
-            "If it is English, output English. If it is Chinese, output Chinese. "
-            "If it is a mix of both (code-switching, e.g. Chinese with English technical terms), "
-            "you MUST maintain that exact bilingual structure. NEVER automatically translate between languages unless explicitly instructed. "
-            "Only fix grammar, tone, formality, phrasing, and clarity."
-        )
+        # Load user's custom dictionaries from config
+        custom_personas = self.config.get("ai_custom_personas", {})
+        custom_styles = self.config.get("ai_custom_styles", {})
+        custom_translations = self.config.get("ai_custom_translations", {})
         
-        system_prompt = f"{prompt_template}\n\n{language_directive}\nOutput only the refined text. Do not add intro/outro."
+        # Merge built-in presets with user customs
+        all_personas = {**AI_PERSONAS, **custom_personas}
+        all_styles = {**AI_STYLES, **custom_styles}
+        all_translations = {**AI_TRANSLATIONS, **custom_translations}
+
+        # Check Active Profile logic
+        active_profile_name = self.config.get("ai_active_profile", "")
+        saved_profiles = self.config.get("ai_saved_profiles", {})
+
+        if active_profile_name and active_profile_name in saved_profiles:
+            profile = saved_profiles[active_profile_name]
+            p_key = profile.get("persona", "None")
+            s_key = profile.get("style", "None")
+            t_key = profile.get("translation", "None")
+        else:
+            # Fallback to direct singular selections if no profile is active 
+            # (or for backward compatibility / manual GUI mode)
+            p_key = self.config.get("ai_persona", "None")
+            s_key = self.config.get("ai_style", "None")
+            t_key = self.config.get("ai_translation", "None")
+
+        # Fetch the actual descriptive strings based on keys
+        persona_str = all_personas.get(p_key, "")
+        style_str = all_styles.get(s_key, "")
+        trans_str = all_translations.get(t_key, "")
+
+        # 3. Build the System Prompt
+        system_prompt_parts = ["Fix grammar, spelling, and phrasing in the following text."]
+        
+        if persona_str:
+            system_prompt_parts.append(f"[PERSONA]\n{persona_str}")
+            
+        if style_str:
+            system_prompt_parts.append(f"[STYLE]\n{style_str}")
+            
+        if trans_str:
+            system_prompt_parts.append(f"[TRANSLATION TARGET]\n{trans_str}")
+        else:
+            # If Translation is "None" / empty, enforce Language Preservation
+            language_directive = (
+                "[LANGUAGE PRESERVATION]\n"
+                "CRITICAL: You MUST preserve the exact language(s) of the original text. "
+                "If it is English, output English. If it is Chinese, output Chinese. "
+                "If it is a mix of both (code-switching, e.g. Chinese with English technical terms), "
+                "you MUST maintain that exact bilingual structure. NEVER automatically translate between languages unless explicitly instructed."
+            )
+            system_prompt_parts.append(language_directive)
+            
+        system_prompt_parts.append("Output only the refined text. Do not add conversational intro/outro or quotes.")
+        
+        system_prompt = "\n\n".join(system_prompt_parts)
         
         headers = {
             "Authorization": f"Bearer {api_key}",

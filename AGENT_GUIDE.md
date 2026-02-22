@@ -30,28 +30,28 @@ A universal, highly compatible voice dictation tool for Windows that works in **
 
 ### 4. AI Polish (Post-Processing)
 - **Goal**: Refine raw speech text (grammar, tone, formatting) using LLMs.
-- **Design Constraints & Rules**:
-    - **No Unsolicited Translation**: The AI must adjust tone, style, formality, and vocabulary based on input, but it must NEVER automatically translate between languages (e.g., CN to EN) unless the user explicitly selects a translation prompt.
-    - **Language Preservation Directive**: The AI must strictly preserve the exact language(s) of the original text, including natural bilingual code-switching (e.g., Chinese with English technical terms). It must not homogenize the text into one language.
-    - **Custom Prompts**: Users can define, save, and delete custom scenario prompts in the GUI. These save to `config.json` under `ai_custom_prompts`.
+- **Architecture**:
+    - **Modular Profiles**: The system uses a "Three Pillars" approach: **Persona**, **Style**, and **Translation**. These are distinct text templates that are concatenated at runtime.
+    - **Language Preservation Directive**: If Translation is "None", the system injects a strict global directive preventing the AI from automatically translating between languages (e.g., CN to EN) to preserve natural bilingual code-switching.
+    - **Custom Prompts**: Users can define, save, and delete custom items for each pillar in the GUI. These save to `config.json` under `ai_custom_personas`, `ai_custom_styles`, etc.
+    - **Quick Profiles**: Combinations of the three pillars can be saved as named profiles (`ai_saved_profiles`) and switched effortlessly from the Windows System Tray menu without opening settings.
 - **Implementation**:
-    - `ai_helper.py`: Handles API requests and injects the global Language Preservation Directive into the system prompt.
-    - `input`: Raw text from Whisper.
-    - `processing`: Sends text + System Prompt to LLM.
-    - `output`: Refined text replaces original text in `_output_text`.
-- **Configuration**: Managed in `settings_gui.py` -> "AI Polish" tab.
-- **Dependencies**: Requires `requests` library.
+    - `ai_helper.py`: Constructs the dynamic system prompt and handles API requests.
+    - `settings_gui.py`: Manages the UI for the three pillars and custom definitions.
+    - `dictation-universal.py`: Manages the System Tray menu logic for dynamic profile switching.
+- **Dependencies**: Requires `openai` module (compatible with OpenAI, DeepSeek, Gemini).
 
 ### 5. Settings GUI Rendering
 - **Problem**: The `customtkinter` window sometimes spawns off-center (e.g., top-left) because `winfo_width()` returns placeholder values before the window finishes rendering natively on Windows.
 - **Solution**: Hardcode the known initial fallback dimensions (`640x800`) into the centering geometry math to guarantee a perfectly centered spawn.
 
-## 📁 File Structure
+## 📁 Deployment & File Structure
+- **Deployment Script (`build_exe.py`)**: The project uses `PyInstaller` to compile the Python application and all its heavy ML dependencies (faster-whisper, ctranslate2, torch) into a single standalone directory (`dist/VoicePro`) containing `VoicePro.exe`. This allows for true portability without end-users needing to install Python.
 - `dictation-universal.py`: **Main Application**.
 - `ai_helper.py`: **AI Client Module**.
-- `start-universal.bat`: **Launcher** (use this).
+- `ai_presets.py`: **Hardcoded Defaults for Personas, Styles, and Translations**.
+- `start-universal.bat`: **Launcher** (Elevates to Admin and runs the `VoicePro.exe` build).
 - `settings_gui.py`: Configuration UI.
-- `legacy/`: Archive of old/superseded scripts.
 
 ## ⚠️ Known Issues
 - **Notepad Input**: Requires small `time.sleep(0.01)` between chars (already implemented).

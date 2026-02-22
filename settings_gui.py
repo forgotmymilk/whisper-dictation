@@ -11,6 +11,8 @@ import os
 import tkinter as tk
 import customtkinter as ctk
 
+from ai_presets import AI_PERSONAS, AI_STYLES, AI_TRANSLATIONS
+
 
 CONFIG_FILE = "config.json"
 
@@ -30,15 +32,6 @@ OUTPUT_MODES = ["type", "clipboard", "both"]
 FORMALITY_LEVELS = ["casual", "formal", "business"]
 PRIMARY_LANGS = [("Auto", "auto"), ("Chinese", "zh"), ("English", "en"), ("Mixed", "mixed")]
 INPUT_METHODS = ["unicode", "keyboard", "clipboard"]
-
-AI_PROMPTS = {
-    "Grammar Fix": "Correct the grammar and spelling. Output only the corrected text.",
-    "Professional": "Rewrite to sound professional and polite. Output only the rewritten text.",
-    "Native Speaker": "Rephrase to sound like a native speaker. Output only the refined text.",
-    "Concise": "Rewrite to be concise and clear. Remove fluff. Output only the result.",
-    "Bullet Points": "Summarize into a bulleted list.",
-    "Translator (CN->EN)": "Translate the following Chinese text into natural English."
-}
 
 AI_PROVIDERS = {
     "--- International ---": {"url": "", "model": ""},
@@ -412,6 +405,7 @@ class SettingsApp(ctk.CTk):
         self._spinbox(c, "Audio threshold", "audio_threshold", 0.001, 0.5, step=0.005)
         self._spinbox(c, "Min recording (sec)", "min_duration", 0.1, 5.0, step=0.1)
         self._switch(c, "Auto-minimize console", "auto_minimize_console")
+        self._switch(c, "Launch at startup", "launch_at_startup")
         self._switch(c, "Sound feedback (beeps)", "sound_feedback")
         ctk.CTkFrame(c, fg_color="transparent", height=8).pack()
 
@@ -523,66 +517,144 @@ class SettingsApp(ctk.CTk):
         self.vars["ai_model"] = ctk.StringVar(value=self.cfg.get("ai_model", "gpt-4o-mini"))
         self._entry(c, "Model Name", "ai_model")
 
-        # Preset Prompts Dropdown
-        self._label(c, "Prompt Template:")
+        # --- THE THREE PILLARS (Persona, Style, Translation) ---
         
-        prompt_var = ctk.StringVar(value=self.cfg.get("ai_prompt_template", AI_PROMPTS.get("Grammar Fix", "")))
-        self.vars["ai_prompt_template"] = prompt_var
-
-        custom_prompts = self.cfg.get("ai_custom_prompts", {})
-        all_prompts = {**AI_PROMPTS, **custom_prompts}
-
-        def on_preset_change(choice):
-            prompt_var.set(all_prompts.get(choice, ""))
-
-        prompt_frame = ctk.CTkFrame(c, fg_color="transparent")
-        prompt_frame.pack(pady=5, fill="x", padx=16)
-
-        preset_menu = ctk.CTkOptionMenu(prompt_frame, values=list(all_prompts.keys()), command=on_preset_change)
-        preset_menu.pack(side="left", fill="x", expand=True)
-
-        found_key = next((k for k, v in all_prompts.items() if v == prompt_var.get()), "Select a preset...")
-        preset_menu.set(found_key)
+        # Load custom dicts from config or default to empty
+        custom_personas = self.cfg.get("ai_custom_personas", {})
+        custom_styles = self.cfg.get("ai_custom_styles", {})
+        custom_translations = self.cfg.get("ai_custom_translations", {})
         
-        def save_new_prompt():
-            dialog = ctk.CTkInputDialog(text="Enter name for new prompt preset:", title="Save Preset")
-            name = dialog.get_input()
-            if name and name.strip():
-                name = name.strip()
-                custom_prompts[name] = prompt_var.get()
-                self.cfg["ai_custom_prompts"] = custom_prompts
-                all_prompts.update({name: prompt_var.get()})
-                preset_menu.configure(values=list(all_prompts.keys()))
-                preset_menu.set(name)
+        all_personas = {**AI_PERSONAS, **custom_personas}
+        all_styles = {**AI_STYLES, **custom_styles}
+        all_translations = {**AI_TRANSLATIONS, **custom_translations}
+        
+        # Add a special "Add Custom..." option to the dropdown lists
+        p_list = list(all_personas.keys()) + ["---", "+ Add Custom..."]
+        s_list = list(all_styles.keys()) + ["---", "+ Add Custom..."]
+        t_list = list(all_translations.keys()) + ["---", "+ Add Custom..."]
+
+        self.vars["ai_persona"] = ctk.StringVar(value=self.cfg.get("ai_persona", "None"))
+        self.vars["ai_style"] = ctk.StringVar(value=self.cfg.get("ai_style", "None"))
+        self.vars["ai_translation"] = ctk.StringVar(value=self.cfg.get("ai_translation", "None"))
+        
+        def make_custom_handler(category, custom_dict, all_dict, var, menu_widget, config_key):
+            def handler(choice):
+                if choice == "---":
+                    var.set("None")
+                elif choice == "+ Add Custom...":
+                    # Prompt for Name
+                    name_dialog = ctk.CTkInputDialog(text=f"Enter a short name for this custom {category}:", title="Add Custom")
+                    name = name_dialog.get_input()
+                    if not name or not name.strip():
+                        var.set("None")
+                        return
+                        
+                    # Prompt for Prompt Text
+                    prompt_dialog = ctk.CTkInputDialog(text=f"Enter the exact prompt instruction for '{name}':\n(e.g., 'You are a cynical pirate.')", title="Add Instruction")
+                    prompt_text = prompt_dialog.get_input()
+                    
+                    if name and prompt_text:
+                        name = name.strip()
+                        custom_dict[name] = prompt_text.strip()
+                        self.cfg[config_key] = custom_dict
+                        all_dict.update({name: prompt_text.strip()})
+                        
+                        # Update dropdown
+                        new_values = list(all_dict.keys()) + ["---", "+ Add Custom..."]
+                        menu_widget.configure(values=new_values)
+                        var.set(name)
+                    else:
+                        var.set("None")
+            return handler
+
+        # 1. Persona
+        self._label(c, "1. Persona (Who is the AI?)")
+        p_menu = ctk.CTkOptionMenu(c, variable=self.vars["ai_persona"], values=p_list, width=250)
+        p_menu.configure(command=make_custom_handler("Persona", custom_personas, all_personas, self.vars["ai_persona"], p_menu, "ai_custom_personas"))
+        p_menu.pack(pady=5, anchor="w", padx=16)
+        
+        # 2. Style
+        self._label(c, "2. Style (How should it speak?)")
+        s_menu = ctk.CTkOptionMenu(c, variable=self.vars["ai_style"], values=s_list, width=250)
+        s_menu.configure(command=make_custom_handler("Style", custom_styles, all_styles, self.vars["ai_style"], s_menu, "ai_custom_styles"))
+        s_menu.pack(pady=5, anchor="w", padx=16)
+
+        # 3. Translation
+        self._label(c, "3. Translation (Target Language)")
+        t_menu = ctk.CTkOptionMenu(c, variable=self.vars["ai_translation"], values=t_list, width=250)
+        t_menu.configure(command=make_custom_handler("Translation", custom_translations, all_translations, self.vars["ai_translation"], t_menu, "ai_custom_translations"))
+        t_menu.pack(pady=5, anchor="w", padx=16)
+
+        # Remove Custom Button
+        def remove_custom():
+            curr_p = self.vars["ai_persona"].get()
+            curr_s = self.vars["ai_style"].get()
+            curr_t = self.vars["ai_translation"].get()
+            
+            deleted_any = False
+            
+            if curr_p in custom_personas:
+                del custom_personas[curr_p]
+                del all_personas[curr_p]
+                self.cfg["ai_custom_personas"] = custom_personas
+                self.vars["ai_persona"].set("None")
+                p_menu.configure(values=list(all_personas.keys()) + ["---", "+ Add Custom..."])
+                deleted_any = True
                 
-        def delete_prompt():
-            current_name = preset_menu.get()
-            if current_name in custom_prompts:
-                del custom_prompts[current_name]
-                self.cfg["ai_custom_prompts"] = custom_prompts
-                if current_name in all_prompts:
-                    del all_prompts[current_name]
-                preset_menu.configure(values=list(all_prompts.keys()))
-                preset_menu.set("Select a preset...")
+            if curr_s in custom_styles:
+                del custom_styles[curr_s]
+                del all_styles[curr_s]
+                self.cfg["ai_custom_styles"] = custom_styles
+                self.vars["ai_style"].set("None")
+                s_menu.configure(values=list(all_styles.keys()) + ["---", "+ Add Custom..."])
+                deleted_any = True
+                
+            if curr_t in custom_translations:
+                del custom_translations[curr_t]
+                del all_translations[curr_t]
+                self.cfg["ai_custom_translations"] = custom_translations
+                self.vars["ai_translation"].set("None")
+                t_menu.configure(values=list(all_translations.keys()) + ["---", "+ Add Custom..."])
+                deleted_any = True
+                
+            if not deleted_any:
+                tk.messagebox.showinfo("Wait", "Select a custom Persona, Style, or Translation from the dropdowns first to delete it. Built-in presets cannot be deleted.")
 
-        ctk.CTkButton(prompt_frame, text="Save As", width=60, fg_color=COLORS["success"], hover_color="#00b88c", command=save_new_prompt).pack(side="left", padx=(8, 0))
-        ctk.CTkButton(prompt_frame, text="Delete", width=60, fg_color=COLORS["danger"], hover_color="#e65c5c", command=delete_prompt).pack(side="left", padx=(8, 0))
+        # Save Quick Profile
+        def save_quick_profile():
+            curr_p = self.vars["ai_persona"].get()
+            curr_s = self.vars["ai_style"].get()
+            curr_t = self.vars["ai_translation"].get()
 
-        # Text Area for Prompt
-        txt = ctk.CTkTextbox(c, height=100)
-        txt.pack(pady=5, fill="x")
-        txt.insert("1.0", prompt_var.get())
-        
-        # Bind textbox changes to variable? No easy way in ctk. 
-        # We will read from textbox on save.
-        self.vars["ai_prompt_textbox"] = txt 
-        
-        # Update textbox when variable changes (from dropdown)
-        def update_textbox(*args):
-            txt.delete("1.0", "end")
-            txt.insert("1.0", prompt_var.get())
-        
-        prompt_var.trace_add("write", update_textbox)
+            dialog = ctk.CTkInputDialog(text="Enter a name for this Quick Profile:", title="Save Quick Profile")
+            name = dialog.get_input()
+            if not name or not name.strip():
+                return
+            
+            name = name.strip()
+            
+            # Load existing saved profiles
+            saved_profiles = self.cfg.get("ai_saved_profiles", {})
+            saved_profiles[name] = {
+                "persona": curr_p,
+                "style": curr_s,
+                "translation": curr_t
+            }
+            
+            self.cfg["ai_saved_profiles"] = saved_profiles
+            self.cfg["ai_active_profile"] = name # Immediately set as active
+            
+            tk.messagebox.showinfo("Saved", f"Profile '{name}' saved successfully.\nIt will appear in the System Tray menu.")
+
+        # Action Buttons Row
+        action_frame = ctk.CTkFrame(c, fg_color="transparent")
+        action_frame.pack(pady=10, fill="x", padx=16)
+
+        ctk.CTkButton(action_frame, text="Save as Quick Profile", fg_color=COLORS["success"], hover_color="#00b88c", command=save_quick_profile).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(action_frame, text="Delete Selected Custom Presets", fg_color=COLORS["danger"], hover_color="#e65c5c", command=remove_custom).pack(side="left")
+
+        # NOTE: Profile switching logic will be built into the system tray mechanism,
+        # but the active baseline choices are saved here.
 
     def _on_ai_provider_change(self, choice):
         if choice.startswith("---"):
@@ -640,6 +712,7 @@ class SettingsApp(ctk.CTk):
             c["audio_threshold"] = float(self.vars["audio_threshold"].get())
             c["min_duration"] = float(self.vars["min_duration"].get())
             c["auto_minimize_console"] = self.vars["auto_minimize_console"].get()
+            c["launch_at_startup"] = self.vars["launch_at_startup"].get()
             c["sound_feedback"] = self.vars["sound_feedback"].get()
 
             # Transcription
@@ -689,9 +762,22 @@ class SettingsApp(ctk.CTk):
             c["ai_api_key"] = self.vars["ai_api_key"].get()
             c["ai_base_url"] = self.vars["ai_base_url"].get()
             c["ai_model"] = self.vars["ai_model"].get()
-            c["ai_custom_prompts"] = self.cfg.get("ai_custom_prompts", {})
-            # Read from textbox directly
-            c["ai_prompt_template"] = self.vars["ai_prompt_textbox"].get("1.0", "end-1c")
+            c["ai_model"] = self.vars["ai_model"].get()
+            
+            c["ai_persona"] = self.vars["ai_persona"].get()
+            c["ai_style"] = self.vars["ai_style"].get()
+            c["ai_translation"] = self.vars["ai_translation"].get()
+            
+            # Carry over custom saved dicts and profiles
+            c["ai_custom_personas"] = self.cfg.get("ai_custom_personas", {})
+            c["ai_custom_styles"] = self.cfg.get("ai_custom_styles", {})
+            c["ai_custom_translations"] = self.cfg.get("ai_custom_translations", {})
+            c["ai_saved_profiles"] = self.cfg.get("ai_saved_profiles", {})
+            
+            # Since user clicked 'Save' in Settings UI, we assume they want these base settings active.
+            # If they just created a profile, self.cfg["ai_active_profile"] will be set to it.
+            # Otherwise we clear out any active quick profile so the naked dropdown selections take precedence.
+            c["ai_active_profile"] = self.cfg.get("ai_active_profile", "")
 
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(c, f, indent=2, ensure_ascii=False)

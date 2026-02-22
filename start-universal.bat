@@ -16,23 +16,24 @@ echo.
 
 cd /d "%~dp0"
 
-if not exist ".venv\Scripts\python.exe" (
-    echo [!] Virtual environment not found!
+set EXE_PATH="dist\VoicePro\VoicePro.exe"
+
+if not exist %EXE_PATH% (
+    echo [!] VoicePro executable not found!
     echo.
-    echo Please run one of the following first:
-    echo   - install.bat          ^(First time setup^)
-    echo   - portable-setup.bat   ^(Portable mode^)
+    echo Please ensure you have downloaded the fully compiled release,
+    echo or run 'build_exe.py' if you are building from source.
     echo.
     pause
     exit /b 1
 )
 
-echo [*] Starting Universal Whisper Dictation...
+echo [*] Starting VoicePro...
 echo [*] Running as Administrator
 echo [*] Right-click tray icon to exit
 echo.
 
-.venv\Scripts\python.exe dictation-universal.py
+start "" %EXE_PATH%
 
 if %errorlevel% neq 0 (
     echo.

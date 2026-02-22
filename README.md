@@ -12,10 +12,10 @@
 - **混合 (Mixed)**: 自动优化中英文之间的空格 (Auto-spacing between Chinese & English)。
 
 ### ✨ AI 润色 (AI Polish)
-- **语法修正 (Grammar Fix)**: 瞬间修复口语中的语法错误。
-- **自定义语境 (Custom Scenarios)**: 在设置中自定义和保存属于你的专属 AI Prompt。
-- **混合语言保护 (Language Preservation)**: 严格保留原句的真实语种，拒绝 AI 自作聪明的强制翻译，完美支持中英夹杂 (Code-switching)。
-- **翻译 (Translation)**: 仅在显式选择翻译模板时，执行指定翻译。
+- **多模块配置 (Modular Profiles)**: 摒弃单一 Prompt，自由组合 **[Persona (人设)] + [Style (文风)] + [Translation (翻译)]**。
+- **丰富的预设库 (Built-in Presets)**: 内置多种热门人设与翻译模板 (如 Steve Jobs, Yoda, 翻译为地道美语等)。
+- **快速切换 (Quick Switch)**: 支持将配置保存为 Quick Profile，在系统托盘右键菜单中一键切换。
+- **混合语言保护 (Language Preservation)**: 严格保留原句的真实语种，完美支持中英夹杂 (Code-switching)。
 - **兼容性 (BYO Key)**: 支持 OpenAI, DeepSeek, Google Gemini 等所有兼容 API。
 
 ### 💾 状态备份与本地归档 (Stateful Backup & Archiving)
@@ -35,11 +35,10 @@
 ## 🚀 快速开始 / Quick Start
 
 ### 首次安装 / First Time Setup
-1. **下载** 项目文件夹。
-2. **双击** `portable-setup.bat`。
-3. **等待** 安装完成 (约 5-10 分钟)。
-4. **双击** `start-universal.bat`。
-5. **跟随** 交互式向导完成设置。
+1. **下载** 最新版的压缩包 (由 `build_exe.py` 生成的便携化分发包)。
+2. **解压** 到任意目录。
+3. **双击** `start-universal.bat` (或直接运行 `dist/VoicePro/VoicePro.exe`)。
+4. **跟随** 屏幕向导在首次启动时完成偏好设置。
 
 ### 日常使用 / Daily Use
 只需运行 `start-universal.bat`，然后：
@@ -59,10 +58,11 @@
 - **快捷键**: 自定义触发键 (推荐 F15-F20)
 
 ### AI 润色设置 / AI Polish Setup
-在托盘图标右键 -> **Settings** -> **AI Polish** 页签：
-- **Enable AI Polish**: 开启功能
-- **API Key**: 填入你的 LLM API Key
-- **Prompt Template**: 选择预设模板 (如 Grammar Fix) 或自定义
+通过托盘右键 -> **Settings** 或直接编辑配置：
+- **开启**: Switch on "Enable AI Polish"。
+- **填写 API**: 填入你的 Base URL, Model Name 和 API Key。
+- **三支柱组合 (Three Pillars)**: 从下拉菜单中分别选择你的 Persona, Style 和 Translation。
+- **保存配置**: 点击 "Save as Quick Profile" 可以在系统托盘菜单中快速切换专属配置！
 
 ### 配置文件 / User Config
 所有设置保存在 `user-config.json` 中：
@@ -121,14 +121,16 @@ Output: Hello. Today is a great day. I want to go to the park.
 
 ```
 whisper-dictation/
-├── dictation-universal.py      # 主程序 (Main Program)
-├── ai_helper.py                # AI 润色模块 (AI Module)
-├── start-universal.bat         # 启动脚本 (Launcher)
-├── portable-setup.bat          # 安装脚本 (Installer)
-├── settings_gui.py             # 设置界面 (Settings UI)
+├── dist/VoicePro/              # 编译后的便携版程序 (Compiled Standalone App)
+│   └── VoicePro.exe            # 主执行文件
+├── start-universal.bat         # 便携启动脚本 (Portable Launcher)
+├── dictation-universal.py      # 核心源码 (Main Source Code)
+├── ai_helper.py                # AI 模块引擎 (AI Module)
+├── ai_presets.py               # AI 预设数据 (AI Configuration Data)
+├── settings_gui.py             # 设置界面源码 (Settings UI Source)
+├── build_exe.py                # 编译打包脚本 (PyInstaller Build Script)
 ├── user-config.json            # 用户配置 (User Config)
-├── AGENT_GUIDE.md              # 开发者指南 (Developer Guide)
-└── .venv/                      # Python 环境 (Python Env)
+└── AGENT_GUIDE.md              # 开发者指南 (Developer Guide)
 ```
 
 ---
