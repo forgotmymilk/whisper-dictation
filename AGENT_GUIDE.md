@@ -48,10 +48,25 @@ A universal, highly compatible voice dictation tool for Windows that works in **
 ## 📁 Deployment & File Structure
 - **Deployment Script (`build_exe.py`)**: The project uses `PyInstaller` to compile the Python application and all its heavy ML dependencies (faster-whisper, ctranslate2, torch) into a single standalone directory (`dist/VoicePro`) containing `VoicePro.exe`. This allows for true portability without end-users needing to install Python.
 - `dictation-universal.py`: **Main Application**.
+- `floating_ui.py`: **Floating Panel UI** (Runs as a subprocess to avoid Tkinter/Pystray main-thread deadlocks).
+- `settings_gui.py`: **Configuration UI** (Runs as a subprocess).
+- `.floating_state.json`: **IPC State File** (Simple JSON file used for Inter-Process Communication between the main app and Floating UI).
+- `start-universal.bat`: **Smart Launcher** (Elevates to Admin. Prefers running from source `.venv` if available, falls back to `VoicePro.exe` build).
+- `start-dev.bat`: **Dev Launcher** (Forces running from source code for debugging).
 - `ai_helper.py`: **AI Client Module**.
 - `ai_presets.py`: **Hardcoded Defaults for Personas, Styles, and Translations**.
-- `start-universal.bat`: **Launcher** (Elevates to Admin and runs the `VoicePro.exe` build).
-- `settings_gui.py`: Configuration UI.
+
+## 🧠 Architectural Paradigms
+
+### Multi-Process Architecture
+- **Tkinter Threading Conflict**: On Windows, `tkinter` and system tray libraries (`pystray`) both demand the main thread. Running Tkinter in a sub-thread causes fatal deadlocks.
+- **Solution**: Any Tkinter GUI (`floating_ui.py`, `settings_gui.py`) MUST be launched as a detached `subprocess.Popen` rather than a thread.
+- **IPC Mechanism**: Communication between `dictation-universal.py` and `floating_ui.py` is achieved via a shared `.floating_state.json` file. The main app writes the recording state (volume, processing), and the UI writes user click interactions ("toggle_record"). Both processes poll this file.
+
+### Subprocess Launching (Frozen vs Dev modes)
+- When launching subprocesses from the main app, be aware of PyInstaller's `sys.frozen` context. 
+- In development, `sys.executable` points to Python.
+- In a compiled bundle, `sys.executable` points to `VoicePro.exe`. Subprocesses must specifically locate the embedded Python interpreter (e.g., in `_internal/python.exe`) and set the `PYTHONPATH` correctly to successfully run side-scripts like `settings_gui.py`.
 
 ## ⚠️ Known Issues
 - **Notepad Input**: Requires small `time.sleep(0.01)` between chars (already implemented).
@@ -66,4 +81,4 @@ A universal, highly compatible voice dictation tool for Windows that works in **
     - **Language**: Python 3.10+
     - **Audio Engine**: `sounddevice` + `numpy`
     - **Model**: `faster-whisper` (CTranslate2) for performance.
-    - **UI**: `tkinter` (keep it simple/native).
+    - **UI**: `tkinter` + `customtkinter` (keep it lightweight and standalone).
