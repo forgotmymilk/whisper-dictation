@@ -883,14 +883,51 @@ class WhisperDictation:
             self.tray.stop()
 
     def _on_settings(self, icon=None, item=None):
-        """open settings GUI as subprocess."""
+        """Open settings GUI as a subprocess (robust for both dev and PyInstaller modes)."""
         try:
-            # Launch settings_gui.py in a separate process
-            # This avoids threading conflicts with tkinter
-            cmd = [sys.executable, "settings_gui.py"]
-            self._settings_process = subprocess.Popen(cmd, cwd=os.path.dirname(os.path.abspath(__file__)))
-            
-            # Start a thread to wait for it to close, then reload config
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+
+            if getattr(sys, 'frozen', False):
+                # Running as a PyInstaller .exe bundle
+                # Settings script is placed beside the exe as --add-data
+                exe_dir = os.path.dirname(sys.executable)
+                script = os.path.join(exe_dir, "settings_gui.py")
+
+                # Find embedded Python inside _internal (PyInstaller one-dir layout)
+                python = None
+                internal_dir = os.path.join(exe_dir, "_internal")
+                for search_dir in [internal_dir, exe_dir]:
+                    candidate = os.path.join(search_dir, "python.exe")
+                    if os.path.exists(candidate):
+                        python = candidate
+                        break
+
+                if not python:
+                    # Search recursively as last resort
+                    for dirpath, dirs, files in os.walk(exe_dir):
+                        if "python.exe" in files:
+                            python = os.path.join(dirpath, "python.exe")
+                            break
+
+                if not python or not os.path.exists(script):
+                    print("❌ Settings: Could not locate python.exe or settings_gui.py in bundle.")
+                    return
+
+                env = os.environ.copy()
+                env["PYTHONPATH"] = exe_dir
+                cmd = [python, script]
+            else:
+                # Normal dev mode — use the venv or system python
+                python = sys.executable
+                script = os.path.join(base_dir, "settings_gui.py")
+                env = os.environ.copy()
+                env["PYTHONPATH"] = base_dir
+                cmd = [python, script]
+
+            self._settings_process = subprocess.Popen(
+                cmd, cwd=os.path.dirname(script), env=env,
+                creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
+            )
             threading.Thread(target=self._monitor_settings, daemon=True).start()
         except Exception as e:
             print(f"❌ Failed to launch settings: {e}")

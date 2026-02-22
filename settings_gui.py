@@ -518,145 +518,171 @@ class SettingsApp(ctk.CTk):
         self._entry(c, "Model Name", "ai_model")
 
         # --- THE THREE PILLARS (Persona, Style, Translation) ---
-        
         # Load custom dicts from config or default to empty
         custom_personas = self.cfg.get("ai_custom_personas", {})
         custom_styles = self.cfg.get("ai_custom_styles", {})
         custom_translations = self.cfg.get("ai_custom_translations", {})
-        
+
         all_personas = {**AI_PERSONAS, **custom_personas}
         all_styles = {**AI_STYLES, **custom_styles}
         all_translations = {**AI_TRANSLATIONS, **custom_translations}
-        
-        # Add a special "Add Custom..." option to the dropdown lists
-        p_list = list(all_personas.keys()) + ["---", "+ Add Custom..."]
-        s_list = list(all_styles.keys()) + ["---", "+ Add Custom..."]
-        t_list = list(all_translations.keys()) + ["---", "+ Add Custom..."]
 
         self.vars["ai_persona"] = ctk.StringVar(value=self.cfg.get("ai_persona", "None"))
         self.vars["ai_style"] = ctk.StringVar(value=self.cfg.get("ai_style", "None"))
         self.vars["ai_translation"] = ctk.StringVar(value=self.cfg.get("ai_translation", "None"))
-        
-        def make_custom_handler(category, custom_dict, all_dict, var, menu_widget, config_key):
-            def handler(choice):
-                if choice == "---":
-                    var.set("None")
-                elif choice == "+ Add Custom...":
-                    # Prompt for Name
-                    name_dialog = ctk.CTkInputDialog(text=f"Enter a short name for this custom {category}:", title="Add Custom")
-                    name = name_dialog.get_input()
-                    if not name or not name.strip():
+
+        def open_picker(title, all_dict, custom_dict, config_key, var, btn_ref):
+            """Open a large scrollable picker window for this category."""
+            picker = ctk.CTkToplevel(self)
+            picker.title(title)
+            picker.geometry("420x520")
+            picker.resizable(False, False)
+            picker.grab_set()
+            picker.wm_attributes("-topmost", True)
+
+            # Search bar
+            ctk.CTkLabel(picker, text=f"Select {title}", font=("Segoe UI", 14, "bold")).pack(pady=(14, 4), padx=16, anchor="w")
+            search_var = ctk.StringVar()
+            search_entry = ctk.CTkEntry(picker, placeholder_text="Search...", textvariable=search_var, width=380)
+            search_entry.pack(padx=16, pady=(0, 8))
+
+            # Description label
+            desc_label = ctk.CTkLabel(picker, text="", font=("Segoe UI", 10),
+                                      text_color="#94a3b8", wraplength=380, justify="left")
+            desc_label.pack(padx=16, anchor="w")
+
+            # Scrollable list frame
+            scroll = ctk.CTkScrollableFrame(picker, height=300, fg_color="#1a1a2e")
+            scroll.pack(padx=16, pady=8, fill="both", expand=True)
+
+            selected_btn: list = [None]  # mutable ref to track highlighted button
+
+            def select_item(name):
+                desc = all_dict.get(name, "")
+                if isinstance(desc, dict):
+                    desc = desc.get("instruction", str(desc))
+                desc_label.configure(text=desc[:200] if desc else "(no description)")
+                var.set(name)
+
+            def confirm_selection():
+                chosen = var.get()
+                btn_ref[0].configure(text=f"  {chosen}  ►")
+                picker.destroy()
+
+            def populate_list(filter_text=""):
+                for w in scroll.winfo_children():
+                    w.destroy()
+                # None option first
+                names = ["None"] + [n for n in all_dict if n != "None"
+                                    and filter_text.lower() in n.lower()]
+                for name in names:
+                    is_custom = name in custom_dict
+                    tag = " ✦" if is_custom else ""
+                    row = ctk.CTkFrame(scroll, fg_color="transparent")
+                    row.pack(fill="x", pady=1)
+                    btn_color = "#1e3a5f" if name == var.get() else "transparent"
+                    item_btn = ctk.CTkButton(
+                        row, text=f"{name}{tag}", anchor="w",
+                        fg_color=btn_color, hover_color="#1e3a5f",
+                        text_color="#e2e8f0", font=("Segoe UI", 12),
+                        command=lambda n=name: select_item(n)
+                    )
+                    item_btn.pack(fill="x", side="left", expand=True, padx=(0, 2))
+                    if is_custom:
+                        del_btn = ctk.CTkButton(
+                            row, text="✕", width=28, fg_color="#7f1d1d",
+                            hover_color="#991b1b", text_color="white",
+                            command=lambda n=name: delete_custom(n, populate_list)
+                        )
+                        del_btn.pack(side="right")
+
+            def delete_custom(name, refresh_fn):
+                if name in custom_dict:
+                    del custom_dict[name]
+                    del all_dict[name]
+                    self.cfg[config_key] = custom_dict
+                    if var.get() == name:
                         var.set("None")
-                        return
-                        
-                    # Prompt for Prompt Text
-                    prompt_dialog = ctk.CTkInputDialog(text=f"Enter the exact prompt instruction for '{name}':\n(e.g., 'You are a cynical pirate.')", title="Add Instruction")
-                    prompt_text = prompt_dialog.get_input()
-                    
-                    if name and prompt_text:
-                        name = name.strip()
-                        custom_dict[name] = prompt_text.strip()
-                        self.cfg[config_key] = custom_dict
-                        all_dict.update({name: prompt_text.strip()})
-                        
-                        # Update dropdown
-                        new_values = list(all_dict.keys()) + ["---", "+ Add Custom..."]
-                        menu_widget.configure(values=new_values)
-                        var.set(name)
-                    else:
-                        var.set("None")
-            return handler
+                    refresh_fn()
 
-        # 3-column compact layout for Persona, Style, Translation
-        pillars_frame = ctk.CTkFrame(c, fg_color="transparent")
-        pillars_frame.pack(pady=5, fill="x", padx=16)
-        pillars_frame.columnconfigure((0, 1, 2), weight=1, uniform="pillar")
+            search_var.trace_add("write", lambda *a: populate_list(search_var.get()))
+            populate_list()
 
-        # Column 1: Persona
-        ctk.CTkLabel(pillars_frame, text="Persona", font=("", 11), text_color="#aaa").grid(row=0, column=0, sticky="w", padx=(0, 4))
-        p_menu = ctk.CTkOptionMenu(pillars_frame, variable=self.vars["ai_persona"], values=p_list, width=160)
-        p_menu.configure(command=make_custom_handler("Persona", custom_personas, all_personas, self.vars["ai_persona"], p_menu, "ai_custom_personas"))
-        p_menu.grid(row=1, column=0, sticky="ew", padx=(0, 4))
+            # Bottom buttons
+            bottom = ctk.CTkFrame(picker, fg_color="transparent")
+            bottom.pack(fill="x", padx=16, pady=(4, 12))
 
-        # Column 2: Style
-        ctk.CTkLabel(pillars_frame, text="Style", font=("", 11), text_color="#aaa").grid(row=0, column=1, sticky="w", padx=4)
-        s_menu = ctk.CTkOptionMenu(pillars_frame, variable=self.vars["ai_style"], values=s_list, width=160)
-        s_menu.configure(command=make_custom_handler("Style", custom_styles, all_styles, self.vars["ai_style"], s_menu, "ai_custom_styles"))
-        s_menu.grid(row=1, column=1, sticky="ew", padx=4)
+            def add_custom():
+                nd = ctk.CTkInputDialog(text=f"Short name for custom {title}:", title="Add Custom")
+                name = nd.get_input()
+                if not name or not name.strip():
+                    return
+                pd = ctk.CTkInputDialog(text=f"Prompt instruction for '{name.strip()}':", title="Add Instruction")
+                prompt = pd.get_input()
+                if name and prompt:
+                    name = name.strip()
+                    custom_dict[name] = prompt.strip()
+                    all_dict[name] = prompt.strip()
+                    self.cfg[config_key] = custom_dict
+                    var.set(name)
+                    populate_list()
 
-        # Column 3: Translation
-        ctk.CTkLabel(pillars_frame, text="Translation", font=("", 11), text_color="#aaa").grid(row=0, column=2, sticky="w", padx=(4, 0))
-        t_menu = ctk.CTkOptionMenu(pillars_frame, variable=self.vars["ai_translation"], values=t_list, width=160)
-        t_menu.configure(command=make_custom_handler("Translation", custom_translations, all_translations, self.vars["ai_translation"], t_menu, "ai_custom_translations"))
-        t_menu.grid(row=1, column=2, sticky="ew", padx=(4, 0))
+            ctk.CTkButton(bottom, text="+ Add Custom", fg_color="#1e40af", hover_color="#2563eb",
+                          command=add_custom).pack(side="left", padx=(0, 8))
+            ctk.CTkButton(bottom, text="✔ Confirm", fg_color=COLORS["success"], hover_color="#00b88c",
+                          command=confirm_selection).pack(side="right")
 
-        # Remove Custom Button
-        def remove_custom():
-            curr_p = self.vars["ai_persona"].get()
-            curr_s = self.vars["ai_style"].get()
-            curr_t = self.vars["ai_translation"].get()
-            
-            deleted_any = False
-            
-            if curr_p in custom_personas:
-                del custom_personas[curr_p]
-                del all_personas[curr_p]
-                self.cfg["ai_custom_personas"] = custom_personas
-                self.vars["ai_persona"].set("None")
-                p_menu.configure(values=list(all_personas.keys()) + ["---", "+ Add Custom..."])
-                deleted_any = True
-                
-            if curr_s in custom_styles:
-                del custom_styles[curr_s]
-                del all_styles[curr_s]
-                self.cfg["ai_custom_styles"] = custom_styles
-                self.vars["ai_style"].set("None")
-                s_menu.configure(values=list(all_styles.keys()) + ["---", "+ Add Custom..."])
-                deleted_any = True
-                
-            if curr_t in custom_translations:
-                del custom_translations[curr_t]
-                del all_translations[curr_t]
-                self.cfg["ai_custom_translations"] = custom_translations
-                self.vars["ai_translation"].set("None")
-                t_menu.configure(values=list(all_translations.keys()) + ["---", "+ Add Custom..."])
-                deleted_any = True
-                
-            if not deleted_any:
-                tk.messagebox.showinfo("Wait", "Select a custom Persona, Style, or Translation from the dropdowns first to delete it. Built-in presets cannot be deleted.")
+        # ---- Three Picker Buttons ----
+        self._label(c, "AI Persona / Style / Translation")
+        for label_text, key, all_d, custom_d, cfg_key in [
+            ("Persona",     "ai_persona",     all_personas,     custom_personas,     "ai_custom_personas"),
+            ("Style",       "ai_style",       all_styles,       custom_styles,       "ai_custom_styles"),
+            ("Translation", "ai_translation", all_translations, custom_translations, "ai_custom_translations"),
+        ]:
+            row_frame = ctk.CTkFrame(c, fg_color="transparent")
+            row_frame.pack(fill="x", padx=16, pady=3)
+
+            lbl = ctk.CTkLabel(row_frame, text=f"{label_text}:", width=90, anchor="w",
+                               font=("Segoe UI", 12), text_color="#94a3b8")
+            lbl.pack(side="left")
+
+            btn_ref = [None]
+            current = self.vars[key].get()
+            btn = ctk.CTkButton(
+                row_frame,
+                text=f"  {current}  ►",
+                anchor="w",
+                fg_color=COLORS["bg_input"],
+                hover_color=COLORS["accent"],
+                text_color=COLORS["text"],
+                width=280,
+            )
+            btn.configure(command=lambda l=label_text, d=all_d, cd=custom_d, ck=cfg_key, v=self.vars[key], br=btn_ref:
+                          open_picker(l, d, cd, ck, v, br))
+            btn.pack(side="left", fill="x", expand=True)
+            btn_ref[0] = btn
 
         # Save Quick Profile
         def save_quick_profile():
             curr_p = self.vars["ai_persona"].get()
             curr_s = self.vars["ai_style"].get()
             curr_t = self.vars["ai_translation"].get()
-
             dialog = ctk.CTkInputDialog(text="Enter a name for this Quick Profile:", title="Save Quick Profile")
             name = dialog.get_input()
             if not name or not name.strip():
                 return
-            
             name = name.strip()
-            
-            # Load existing saved profiles
             saved_profiles = self.cfg.get("ai_saved_profiles", {})
-            saved_profiles[name] = {
-                "persona": curr_p,
-                "style": curr_s,
-                "translation": curr_t
-            }
-            
+            saved_profiles[name] = {"persona": curr_p, "style": curr_s, "translation": curr_t}
             self.cfg["ai_saved_profiles"] = saved_profiles
-            self.cfg["ai_active_profile"] = name # Immediately set as active
-            
-            tk.messagebox.showinfo("Saved", f"Profile '{name}' saved successfully.\nIt will appear in the System Tray menu.")
+            self.cfg["ai_active_profile"] = name
+            tk.messagebox.showinfo("Saved", f"Profile '{name}' saved!\nIt will appear in the System Tray menu.")
 
         # Action Buttons Row
         action_frame = ctk.CTkFrame(c, fg_color="transparent")
         action_frame.pack(pady=10, fill="x", padx=16)
 
         ctk.CTkButton(action_frame, text="Save as Quick Profile", fg_color=COLORS["success"], hover_color="#00b88c", command=save_quick_profile).pack(side="left", padx=(0, 8))
-        ctk.CTkButton(action_frame, text="Delete Selected Custom Presets", fg_color=COLORS["danger"], hover_color="#e65c5c", command=remove_custom).pack(side="left")
 
         # NOTE: Profile switching logic will be built into the system tray mechanism,
         # but the active baseline choices are saved here.
