@@ -567,23 +567,28 @@ class SettingsApp(ctk.CTk):
                         var.set("None")
             return handler
 
-        # 1. Persona
-        self._label(c, "1. Persona (Who is the AI?)")
-        p_menu = ctk.CTkOptionMenu(c, variable=self.vars["ai_persona"], values=p_list, width=250)
-        p_menu.configure(command=make_custom_handler("Persona", custom_personas, all_personas, self.vars["ai_persona"], p_menu, "ai_custom_personas"))
-        p_menu.pack(pady=5, anchor="w", padx=16)
-        
-        # 2. Style
-        self._label(c, "2. Style (How should it speak?)")
-        s_menu = ctk.CTkOptionMenu(c, variable=self.vars["ai_style"], values=s_list, width=250)
-        s_menu.configure(command=make_custom_handler("Style", custom_styles, all_styles, self.vars["ai_style"], s_menu, "ai_custom_styles"))
-        s_menu.pack(pady=5, anchor="w", padx=16)
+        # 3-column compact layout for Persona, Style, Translation
+        pillars_frame = ctk.CTkFrame(c, fg_color="transparent")
+        pillars_frame.pack(pady=5, fill="x", padx=16)
+        pillars_frame.columnconfigure((0, 1, 2), weight=1, uniform="pillar")
 
-        # 3. Translation
-        self._label(c, "3. Translation (Target Language)")
-        t_menu = ctk.CTkOptionMenu(c, variable=self.vars["ai_translation"], values=t_list, width=250)
+        # Column 1: Persona
+        ctk.CTkLabel(pillars_frame, text="Persona", font=("", 11), text_color="#aaa").grid(row=0, column=0, sticky="w", padx=(0, 4))
+        p_menu = ctk.CTkOptionMenu(pillars_frame, variable=self.vars["ai_persona"], values=p_list, width=160)
+        p_menu.configure(command=make_custom_handler("Persona", custom_personas, all_personas, self.vars["ai_persona"], p_menu, "ai_custom_personas"))
+        p_menu.grid(row=1, column=0, sticky="ew", padx=(0, 4))
+
+        # Column 2: Style
+        ctk.CTkLabel(pillars_frame, text="Style", font=("", 11), text_color="#aaa").grid(row=0, column=1, sticky="w", padx=4)
+        s_menu = ctk.CTkOptionMenu(pillars_frame, variable=self.vars["ai_style"], values=s_list, width=160)
+        s_menu.configure(command=make_custom_handler("Style", custom_styles, all_styles, self.vars["ai_style"], s_menu, "ai_custom_styles"))
+        s_menu.grid(row=1, column=1, sticky="ew", padx=4)
+
+        # Column 3: Translation
+        ctk.CTkLabel(pillars_frame, text="Translation", font=("", 11), text_color="#aaa").grid(row=0, column=2, sticky="w", padx=(4, 0))
+        t_menu = ctk.CTkOptionMenu(pillars_frame, variable=self.vars["ai_translation"], values=t_list, width=160)
         t_menu.configure(command=make_custom_handler("Translation", custom_translations, all_translations, self.vars["ai_translation"], t_menu, "ai_custom_translations"))
-        t_menu.pack(pady=5, anchor="w", padx=16)
+        t_menu.grid(row=1, column=2, sticky="ew", padx=(4, 0))
 
         # Remove Custom Button
         def remove_custom():

@@ -47,6 +47,7 @@ def build_executable():
         "--hidden-import", "customtkinter",
         "--add-data", "settings_gui.py;.", # Include settings_gui.py so it can be launched via subprocess
         "--add-data", "ai_presets.py;.",
+        "--add-data", "floating_ui.py;.",  # Include floating UI subprocess
         main_script
     ]
     

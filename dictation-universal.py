@@ -43,6 +43,40 @@ except ImportError:
 # Local modules
 from ai_helper import AIPolish
 
+# ============ FLOATING UI STATE (IPC via file) ============
+FLOATING_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".floating_state.json")
+
+def _update_floating_state(status: str, volume: float = 0.0):
+    """Write state for the floating UI subprocess to read."""
+    try:
+        state = {"status": status, "volume": volume, "click_action": ""}
+        # Preserve click_action if it exists (UI writes it)
+        if os.path.exists(FLOATING_STATE_FILE):
+            with open(FLOATING_STATE_FILE, "r") as f:
+                old = json.load(f)
+                state["click_action"] = old.get("click_action", "")
+        with open(FLOATING_STATE_FILE, "w") as f:
+            json.dump(state, f)
+    except Exception:
+        pass
+
+def _poll_floating_click() -> str:
+    """Check if the floating UI user clicked to toggle recording."""
+    try:
+        if os.path.exists(FLOATING_STATE_FILE):
+            with open(FLOATING_STATE_FILE, "r") as f:
+                state = json.load(f)
+            action = state.get("click_action", "")
+            if action:
+                # Clear the action so it doesn't fire again
+                state["click_action"] = ""
+                with open(FLOATING_STATE_FILE, "w") as f:
+                    json.dump(state, f)
+            return action
+    except Exception:
+        pass
+    return ""
+
 # ============ CONFIGURATION ============
 DEFAULT_CONFIG = {
     "hotkey": "f15",
@@ -678,6 +712,7 @@ class WhisperDictation:
         self.tray = None
         self._stop_event = threading.Event()
         self._state = self.STATE_READY
+        self.is_exiting = False
         self._last_audio_callback_time = time.time()
         self._stream_error_count = 0
 
@@ -777,7 +812,6 @@ class WhisperDictation:
 
     def _build_menu(self) -> pystray.Menu:
         """Build the tray right-click menu."""
-        pause_label = "Resume" if self.is_paused else "Pause"
         
         # Load active profile info
         active_prof = self.config.get("ai_active_profile", "")
@@ -800,8 +834,6 @@ class WhisperDictation:
         profile_items.append(pystray.MenuItem(none_label, lambda icon, item: self._on_switch_profile("")))
 
         return pystray.Menu(
-            pystray.MenuItem(pause_label, self._on_toggle_pause),
-            pystray.Menu.SEPARATOR,
             pystray.MenuItem("AI Quick Profiles", pystray.Menu(*profile_items)),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Settings...", self._on_settings),
@@ -839,7 +871,14 @@ class WhisperDictation:
     def _on_exit(self, icon=None, item=None):
         """Graceful shutdown from tray."""
         print("\n👋 Shutting down...")
+        self.is_exiting = True
         self._stop_event.set()
+        # Terminate floating UI subprocess
+        if hasattr(self, '_floating_proc') and self._floating_proc:
+            try:
+                self._floating_proc.terminate()
+            except Exception:
+                pass
         if self.tray:
             self.tray.stop()
 
@@ -912,10 +951,26 @@ class WhisperDictation:
             )
             print(f"✅ Model loaded successfully!\n")
         except Exception as e:
-            print(f"❌ Failed to load model: {e}")
-            print("   Falling back to CPU mode with base model...")
-            self.model = WhisperModel("base", device="cpu", compute_type="int8")
-            print(f"✅ Fallback model loaded!\n")
+            print(f"⚠️ Failed to load model from default HuggingFace source: {e}")
+            # Try setting the HuggingFace mirror endpoint for regions with restricted access
+            print("   Attempting to download via hf-mirror.com fallback...")
+            try:
+                os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+                self.model = WhisperModel(
+                    self.model_size,
+                    device=self.device,
+                    compute_type=self.compute_type
+                )
+                print(f"✅ Model loaded successfully via mirror!\n")
+            except Exception as e2:
+                print(f"❌ Failed to load model from mirror: {e2}")
+                print("   Falling back to CPU mode with base model...")
+                try:
+                    self.model = WhisperModel("base", device="cpu", compute_type="int8")
+                    print(f"✅ Fallback model loaded!\n")
+                except Exception as e3:
+                    print(f"❌ Critical failure: Could not load any model: {e3}")
+                    raise
 
     # ---- Recording ----
 
@@ -929,6 +984,12 @@ class WhisperDictation:
         if self.is_recording:
             self._callbacks_during_recording += 1
             self.audio_buffer.append(indata.copy())
+            # Update floating UI with current volume level
+            try:
+                vol = float(np.sqrt(np.mean(indata**2)))
+                _update_floating_state("recording", vol)
+            except Exception:
+                pass
 
     def _play_beep(self, freq: int = 800, duration_ms: int = 100):
         """Play a short beep sound for feedback."""
@@ -960,6 +1021,7 @@ class WhisperDictation:
             self.is_latched = False  # Default to PTT mode, upgrade to latched if released quickly
             
             self._update_tray_state(self.STATE_RECORDING)
+            _update_floating_state("recording")
             self._play_beep(800, 80)
             print("🔴 Recording... (speak now)")
         
@@ -1005,11 +1067,13 @@ class WhisperDictation:
         # print(f"   ⏱ Held {hold_duration:.3f}s / {cb_count} callbacks") # Debug only
 
         self._update_tray_state(self.STATE_PROCESSING)
+        _update_floating_state("processing")
         time.sleep(0.1)
 
         if not self.audio_buffer:
             print("⚠️  No audio captured\n")
             self._update_tray_state(self.STATE_READY)
+            _update_floating_state("idle")
             return
 
         threading.Thread(target=self._process_recording, daemon=True).start()
@@ -1104,6 +1168,7 @@ class WhisperDictation:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
             self._update_tray_state(self.STATE_READY)
+            _update_floating_state("idle")
 
     def _log_history(self, raw_text: str, polished_text: str = None):
         """Append the dictation entry to a local markdown file organized by month."""
@@ -1251,10 +1316,19 @@ class WhisperDictation:
 
             print(f"✅ Ready! Hold '{self.hotkey.upper()}' to dictate...")
             print(f"   Press '{self.pause_hotkey.upper()}' to pause/resume")
+            print(f"   Click the floating orb to toggle recording")
             print(f"   Right-click tray icon → Exit\n")
 
-            # Wait until stop event is set (from tray Exit)
-            self._stop_event.wait()
+            # Polling loop: check for stop event and floating UI clicks
+            while not self._stop_event.is_set():
+                # Check floating UI click actions
+                action = _poll_floating_click()
+                if action == "toggle_record":
+                    if self.is_recording:
+                        self.stop_recording(force=True)
+                    else:
+                        self.start_recording()
+                self._stop_event.wait(0.1)  # 100ms polling interval
 
         finally:
             keyboard.unhook_all()
@@ -1269,6 +1343,18 @@ class WhisperDictation:
         # Start dictation in background thread
         engine_thread = threading.Thread(target=self._run_dictation_loop, daemon=True)
         engine_thread.start()
+
+        # Start floating UI as a separate subprocess (avoids Tkinter main-thread conflict)
+        floating_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "floating_ui.py")
+        self._floating_proc = None
+        try:
+            self._floating_proc = subprocess.Popen(
+                [sys.executable, floating_script],
+                cwd=os.path.dirname(os.path.abspath(__file__)),
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+        except Exception as e:
+            print(f"⚠️ Floating UI could not start: {e}")
 
         # Create and run system tray (blocks on main thread)
         self.tray = pystray.Icon(
