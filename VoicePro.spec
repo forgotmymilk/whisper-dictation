@@ -5,7 +5,7 @@ a = Analysis(
     ['dictation-universal.py'],
     pathex=[],
     binaries=[],
-    datas=[('settings_gui.py', '.'), ('ai_presets.py', '.')],
+    datas=[('settings_gui.py', '.'), ('ai_presets.py', '.'), ('floating_ui.py', '.')],
     hiddenimports=['faster_whisper', 'ctranslate2', 'pystray', 'PIL', 'customtkinter'],
     hookspath=[],
     hooksconfig={},

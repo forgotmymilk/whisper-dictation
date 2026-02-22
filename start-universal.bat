@@ -10,33 +10,46 @@ if %errorlevel% neq 0 (
 )
 
 echo ==========================================
-echo   Universal Whisper Dictation
+echo   VoicePro - Universal Whisper Dictation
 echo ==========================================
 echo.
 
 cd /d "%~dp0"
 
-set EXE_PATH="dist\VoicePro\VoicePro.exe"
+:: ---- Strategy: Prefer source mode if .venv exists ----
+:: This ensures developers always run the latest code.
+:: For portable deployment (no .venv), it falls back to the bundled exe.
 
-if not exist %EXE_PATH% (
-    echo [!] VoicePro executable not found!
+if exist ".venv\Scripts\python.exe" (
+    echo [*] Virtual environment found - running from source code
+    echo [*] Running as Administrator
     echo.
-    echo Please ensure you have downloaded the fully compiled release,
-    echo or run 'build_exe.py' if you are building from source.
+    .venv\Scripts\python.exe dictation-universal.py
+    goto :end
+)
+
+:: ---- Fallback: Run from bundled executable ----
+set EXE_PATH=dist\VoicePro\VoicePro.exe
+
+if not exist "%EXE_PATH%" (
+    echo [!] Neither .venv nor bundled executable found!
+    echo.
+    echo For developers: run 'python -m venv .venv' then 'pip install -r requirements.txt'
+    echo For users:      download the pre-built release from GitHub
     echo.
     pause
     exit /b 1
 )
 
-echo [*] Starting VoicePro...
+echo [*] Starting VoicePro from bundled executable...
 echo [*] Running as Administrator
-echo [*] Right-click tray icon to exit
 echo.
 
-start "" %EXE_PATH%
+start "" "%EXE_PATH%"
 
+:end
 if %errorlevel% neq 0 (
     echo.
-    echo [!] Application exited with error
+    echo [!] Application exited with error code: %errorlevel%
     pause
 )
